@@ -27,4 +27,4 @@ go.work.sum
 # Backup specific files and directories
 .backups/
 .backup.yaml
-bin/backup
+bin/
