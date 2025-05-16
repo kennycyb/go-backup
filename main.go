@@ -5,6 +5,9 @@ import (
 	"os"
 )
 
+// Version will be set during build process
+var Version = "dev"
+
 func main() {
 	// If no arguments provided, print help information
 	if len(os.Args) < 2 {
@@ -20,6 +23,7 @@ func printHelp() {
 	fmt.Println("Go Backup Tool")
 	fmt.Println("==============")
 	fmt.Println("A simple backup utility written in Go")
+	fmt.Printf("Version: %s\n", Version)
 	fmt.Println("")
 	fmt.Println("Usage:")
 	fmt.Println("  go-backup [command] [options]")
