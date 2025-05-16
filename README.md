@@ -25,7 +25,7 @@ The tool can be used via the provided Makefile:
 make build
 
 # Create a backup using default configuration
-make backup
+make run
 
 # List all backups
 make list

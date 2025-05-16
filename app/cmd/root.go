@@ -49,7 +49,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go-backup.yaml)")
 
 	// Add commands
-	rootCmd.AddCommand(backupCmd)
+	rootCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(restoreCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(initCmd)
