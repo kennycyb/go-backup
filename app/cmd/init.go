@@ -10,7 +10,8 @@ import (
 )
 
 type BackupConfig struct {
-	Targets []struct {
+	Excludes []string `yaml:"excludes"`
+	Targets  []struct {
 		Path       string `yaml:"path"`
 		MaxBackups int    `yaml:"maxBackups"`
 	} `yaml:"target"`
