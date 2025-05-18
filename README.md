@@ -30,6 +30,9 @@ make run
 # List all backups
 make list
 
+# List backups with detailed information
+make list-detailed
+
 # List backups from a specific location
 make list-location LOCATION=/path/to/backups
 
@@ -56,6 +59,44 @@ target:
     exclude:
       - "*.tmp"
       - "cache/"
+```
+
+## Commands
+
+### List Command
+
+The `list` command displays backups organized by location and source:
+
+```bash
+# Basic usage
+go-backup list
+
+# Show detailed information
+go-backup list --detailed
+
+# List backups in a specific location
+go-backup list --path /path/to/backups
+```
+
+The list command shows:
+- All configured backup locations
+- Backups grouped by source within each location
+- File size and creation time information
+- Up to 5 most recent backups per source (use --detailed to see all)
+
+### Other Commands
+
+Other available commands include:
+
+```bash
+# Run a backup
+go-backup run
+
+# Initialize a configuration file
+go-backup init
+
+# Restore a backup (not fully implemented yet)
+go-backup restore
 ```
 
 ## Development

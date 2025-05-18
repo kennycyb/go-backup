@@ -66,15 +66,33 @@ install:
 run:
 	$(GO) run $(GOFLAGS) $(LDFLAGS) .
 
+# List backups
+.PHONY: list
+list:
+	$(GO) run $(GOFLAGS) $(LDFLAGS) . list
+
+# List backups with detailed information
+.PHONY: list-detailed
+list-detailed:
+	$(GO) run $(GOFLAGS) $(LDFLAGS) . list --detailed
+
+# List backups from a specific location
+.PHONY: list-location
+list-location:
+	$(GO) run $(GOFLAGS) $(LDFLAGS) . list --path $(LOCATION)
+
 # Help target
 .PHONY: help
 help:
 	@echo "Makefile targets:"
-	@echo "  all        - Default target, builds for current platform"
-	@echo "  build      - Build for the current platform"
-	@echo "  build-all  - Build for all configured platforms"
-	@echo "  clean      - Remove build artifacts"
-	@echo "  install    - Install the application locally"
-	@echo "  run        - Run the application"
-	@echo "  test       - Run tests"
-	@echo "  help       - Show this help message"
+	@echo "  all          - Default target, builds for current platform"
+	@echo "  build        - Build for the current platform"
+	@echo "  build-all    - Build for all configured platforms"
+	@echo "  clean        - Remove build artifacts"
+	@echo "  install      - Install the application locally"
+	@echo "  run          - Run the application"
+	@echo "  list         - List all backups"
+	@echo "  list-detailed - List all backups with detailed information"
+	@echo "  list-location - List backups from a specific location (LOCATION=path)"
+	@echo "  test         - Run tests"
+	@echo "  help         - Show this help message"
