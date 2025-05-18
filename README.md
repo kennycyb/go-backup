@@ -27,8 +27,11 @@ make build
 # Create a backup using default configuration
 make run
 
-# List all backups
+# List backups for current directory
 make list
+
+# List all backups regardless of source
+make list-all
 
 # List backups with detailed information
 make list-detailed
@@ -68,8 +71,11 @@ target:
 The `list` command displays backups organized by location and source:
 
 ```bash
-# Basic usage
+# Basic usage - shows backups for current directory only
 go-backup list
+
+# List all backups regardless of source
+go-backup list --all
 
 # Show detailed information
 go-backup list --detailed
@@ -81,6 +87,7 @@ go-backup list --path /path/to/backups
 The list command shows:
 - All configured backup locations
 - Backups grouped by source within each location
+- By default, only shows backups from the current directory
 - File size and creation time information
 - Up to 5 most recent backups per source (use --detailed to see all)
 

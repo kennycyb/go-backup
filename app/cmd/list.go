@@ -14,6 +14,7 @@ import (
 var (
 	detailed bool
 	listPath string
+	listAll  bool
 )
 
 // Backup represents a backup file with metadata
@@ -34,6 +35,25 @@ var listCmd = &cobra.Command{
 This command will display information about existing backups.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Listing backups...")
+
+		// Get current directory name for filtering
+		currentDir := ""
+		if !listAll {
+			// Get the current directory
+			workDir, err := os.Getwd()
+			if err != nil {
+				fmt.Printf("Warning: Could not get current directory: %v\n", err)
+				fmt.Println("Using default prefix: go-backup")
+				currentDir = "go-backup"
+			} else {
+				// Extract the base name
+				currentDir = filepath.Base(workDir)
+				if currentDir == "." || currentDir == "/" {
+					currentDir = "go-backup"
+				}
+			}
+			fmt.Printf("Filtering backups for source: %s\n", currentDir)
+		}
 
 		// Determine backup locations to scan
 		backupLocations := []string{}
@@ -77,7 +97,7 @@ This command will display information about existing backups.`,
 			}
 
 			// Get backups in this location
-			backups, err := findBackupsInLocation(location)
+			backups, err := findBackupsInLocation(location, currentDir)
 			if err != nil {
 				fmt.Printf("  Error reading backups: %v\n", err)
 				continue
@@ -95,11 +115,21 @@ This command will display information about existing backups.`,
 		}
 
 		if totalBackups == 0 {
-			fmt.Println("\nNo backups found.")
+			if listAll {
+				fmt.Println("\nNo backups found.")
+			} else {
+				fmt.Printf("\nNo backups found for source '%s'.\n", currentDir)
+				fmt.Println("Use --all flag to list all backups regardless of source.")
+			}
 			return
 		}
 
-		fmt.Printf("\nFound %d backups across %d locations:\n", totalBackups, len(locationGroups))
+		if listAll {
+			fmt.Printf("\nFound %d backups across %d locations:\n", totalBackups, len(locationGroups))
+		} else {
+			fmt.Printf("\nFound %d backups for source '%s' across %d locations:\n",
+				totalBackups, currentDir, len(locationGroups))
+		}
 
 		// Display backups by location
 		for location, backups := range locationGroups {
@@ -147,7 +177,7 @@ This command will display information about existing backups.`,
 }
 
 // findBackupsInLocation scans a directory for backup files
-func findBackupsInLocation(dir string) ([]Backup, error) {
+func findBackupsInLocation(dir string, filterPrefix string) ([]Backup, error) {
 	backups := []Backup{}
 
 	files, err := os.ReadDir(dir)
@@ -163,6 +193,11 @@ func findBackupsInLocation(dir string) ([]Backup, error) {
 		fileName := file.Name()
 		if !strings.HasSuffix(fileName, ".tar.gz") {
 			continue // Skip non-backup files
+		}
+
+		// If filtering is enabled, skip files that don't match the current directory prefix
+		if filterPrefix != "" && !listAll && !strings.HasPrefix(fileName, filterPrefix+"-") {
+			continue
 		}
 
 		// Get file info
@@ -259,4 +294,5 @@ func init() {
 	// Local flags for the list command
 	listCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information")
 	listCmd.Flags().StringVarP(&listPath, "path", "p", "", "Custom path to search for backups")
+	listCmd.Flags().BoolVarP(&listAll, "all", "a", false, "List all backups, not just those from current directory")
 }

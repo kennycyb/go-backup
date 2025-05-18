@@ -71,6 +71,11 @@ run:
 list:
 	$(GO) run $(GOFLAGS) $(LDFLAGS) . list
 
+# List all backups regardless of current directory
+.PHONY: list-all
+list-all:
+	$(GO) run $(GOFLAGS) $(LDFLAGS) . list --all
+
 # List backups with detailed information
 .PHONY: list-detailed
 list-detailed:
@@ -91,7 +96,8 @@ help:
 	@echo "  clean        - Remove build artifacts"
 	@echo "  install      - Install the application locally"
 	@echo "  run          - Run the application"
-	@echo "  list         - List all backups"
+	@echo "  list         - List backups for current directory"
+	@echo "  list-all     - List all backups regardless of source directory"
 	@echo "  list-detailed - List all backups with detailed information"
 	@echo "  list-location - List backups from a specific location (LOCATION=path)"
 	@echo "  test         - Run tests"
