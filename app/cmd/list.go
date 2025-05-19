@@ -295,4 +295,7 @@ func init() {
 	listCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information")
 	listCmd.Flags().StringVarP(&listPath, "path", "p", "", "Custom path to search for backups")
 	listCmd.Flags().BoolVarP(&listAll, "all", "a", false, "List all backups, not just those from current directory")
+
+	// Add command to root
+	rootCmd.AddCommand(listCmd)
 }

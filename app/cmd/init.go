@@ -84,4 +84,7 @@ in the current directory. This file will define backup targets and settings.`,
 func init() {
 	// Local flags for the init command
 	initCmd.Flags().BoolVar(&configOverwrite, "overwrite", false, "Overwrite existing configuration file if it exists")
+
+	// Add command to root
+	rootCmd.AddCommand(initCmd)
 }

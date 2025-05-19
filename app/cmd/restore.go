@@ -35,4 +35,7 @@ func init() {
 
 	// Mark required flags
 	restoreCmd.MarkFlagRequired("file")
+
+	// Add command to root
+	rootCmd.AddCommand(restoreCmd)
 }

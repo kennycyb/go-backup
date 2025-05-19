@@ -266,4 +266,7 @@ func init() {
 	runCmd.Flags().BoolVarP(&compress, "compress", "c", true, "Compress the backup")
 	runCmd.Flags().StringVarP(&configFile, "config", "f", ".backup.yaml", "Config file path")
 	runCmd.Flags().StringSliceVar(&excludeDirs, "exclude", []string{".git", "node_modules", "bin"}, "Directories to exclude from backup")
+
+	// Add command to root
+	rootCmd.AddCommand(runCmd)
 }
