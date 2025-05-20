@@ -3,6 +3,7 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,4 +30,28 @@ func ReadBackupConfig(filePath string) (*BackupConfig, error) {
 	}
 
 	return &config, nil
+}
+
+// WriteBackupConfig writes the backup configuration to the specified file
+func WriteBackupConfig(filePath string, config *BackupConfig) error {
+	// Create the directory for the output path if it doesn't exist
+	outputDir := filepath.Dir(filePath)
+	if outputDir != "." {
+		if err := os.MkdirAll(outputDir, 0755); err != nil {
+			return err
+		}
+	}
+
+	// Marshal the config to YAML
+	data, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+
+	// Add comment at the top of the YAML file
+	yamlData := []byte("# Backup configuration file\n")
+	yamlData = append(yamlData, data...)
+
+	// Write the config to file
+	return os.WriteFile(filePath, yamlData, 0644)
 }

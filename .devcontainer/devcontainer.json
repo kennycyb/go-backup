@@ -19,9 +19,7 @@
             },
             "extensions": [
                 "golang.Go",
-                "ms-vscode.makefile-tools",
-                "shardulm94.trailing-spaces",
-                "streetsidesoftware.code-spell-checker"
+                "ms-vscode.makefile-tools"
             ]
         }
     },

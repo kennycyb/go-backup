@@ -3,11 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	configService "github.com/kennycyb/go-backup/internal/service/config"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -42,28 +40,8 @@ in the current directory. This file will define backup targets and settings.`,
 			},
 		}
 
-		// Create the directory for the output path if it doesn't exist
-		outputDir := filepath.Dir(configFile)
-		if outputDir != "." {
-			if err := os.MkdirAll(outputDir, 0755); err != nil {
-				fmt.Printf("Error creating directory %s: %v\n", outputDir, err)
-				return
-			}
-		}
-
-		// Marshal the config to YAML
-		data, err := yaml.Marshal(&config)
-		if err != nil {
-			fmt.Printf("Error marshaling configuration: %v\n", err)
-			return
-		}
-
-		// Add comment at the top of the YAML file
-		yamlData := []byte("# Backup targets\n")
-		yamlData = append(yamlData, data...)
-
 		// Write the config to file
-		err = os.WriteFile(configFile, yamlData, 0644)
+		err := configService.WriteBackupConfig(configFile, &config)
 		if err != nil {
 			fmt.Printf("Error writing configuration file: %v\n", err)
 			return
