@@ -10,8 +10,8 @@ import (
 	"time"
 
 	compressionService "github.com/kennycyb/go-backup/internal/service/compress"
+	configService "github.com/kennycyb/go-backup/internal/service/config"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v3"
 )
 
 var (
@@ -61,7 +61,7 @@ This command will package and compress the specified sources.`,
 
 		// Get excludes from config file
 		configExcludes := []string{} // Default empty list
-		var config *BackupConfig
+		var config *configService.BackupConfig
 
 		// Read config file for excludes
 		configPath := ".backup.yaml"
@@ -70,7 +70,7 @@ This command will package and compress the specified sources.`,
 		}
 
 		var configErr error
-		config, configErr = readBackupConfig(configPath)
+		config, configErr = configService.ReadBackupConfig(configPath)
 		if configErr == nil && len(config.Excludes) > 0 {
 			configExcludes = config.Excludes
 			fmt.Printf("Using excludes from config: %v\n", configExcludes)
@@ -242,21 +242,6 @@ func cleanupOldBackups(backupDir string, maxBackups int) error {
 	}
 
 	return nil
-}
-
-// readBackupConfig reads the backup configuration from the specified file
-func readBackupConfig(filePath string) (*BackupConfig, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-
-	var config BackupConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, err
-	}
-
-	return &config, nil
 }
 
 func init() {

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	configService "github.com/kennycyb/go-backup/internal/service/config"
 	"github.com/spf13/cobra"
 )
 
@@ -64,7 +65,7 @@ This command will display information about existing backups.`,
 		} else {
 			// Read from config file
 			configPath := ".backup.yaml"
-			config, err := readBackupConfig(configPath)
+			config, err := configService.ReadBackupConfig(configPath)
 			if err != nil {
 				fmt.Printf("Warning: Could not read config file: %v\n", err)
 				fmt.Println("Using default backup location: .backups/")

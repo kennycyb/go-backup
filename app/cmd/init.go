@@ -5,17 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	configService "github.com/kennycyb/go-backup/internal/service/config"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
-
-type BackupConfig struct {
-	Excludes []string `yaml:"excludes"`
-	Targets  []struct {
-		Path       string `yaml:"path"`
-		MaxBackups int    `yaml:"maxBackups"`
-	} `yaml:"target"`
-}
 
 var (
 	configOverwrite bool
@@ -37,7 +30,7 @@ in the current directory. This file will define backup targets and settings.`,
 		}
 
 		// Create default configuration
-		config := BackupConfig{
+		config := configService.BackupConfig{
 			Targets: []struct {
 				Path       string `yaml:"path"`
 				MaxBackups int    `yaml:"maxBackups"`
