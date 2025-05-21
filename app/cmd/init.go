@@ -29,10 +29,8 @@ in the current directory. This file will define backup targets and settings.`,
 
 		// Create default configuration
 		config := configService.BackupConfig{
-			Targets: []struct {
-				Path       string `yaml:"path"`
-				MaxBackups int    `yaml:"maxBackups"`
-			}{
+			Excludes: []string{".git", "node_modules", "bin"},
+			Targets: []configService.BackupTarget{
 				{
 					Path:       ".backups/location1",
 					MaxBackups: 7,

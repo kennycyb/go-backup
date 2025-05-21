@@ -9,6 +9,7 @@ A command line tool for creating, managing, and restoring backups.
 - Configurable retention policies
 - File/directory exclusion patterns
 - Automated cleanup of old backups
+- Backup history tracking in configuration file
 
 ## Installation
 
@@ -62,6 +63,12 @@ target:
     exclude:
       - "*.tmp"
       - "cache/"
+    # Backup history is automatically updated
+    backups:
+      - filename: "backup-20250520-123045.tar.gz"
+        source: "/path/to/source"
+        createdAt: "2025-05-20T12:30:45Z"
+        size: 1048576
 ```
 
 ## Commands
@@ -82,6 +89,9 @@ go-backup list --detailed
 
 # List backups in a specific location
 go-backup list --path /path/to/backups
+
+# View backup history from the configuration file
+go-backup list --history
 ```
 
 The list command shows:
@@ -90,6 +100,7 @@ The list command shows:
 - By default, only shows backups from the current directory
 - File size and creation time information
 - Up to 5 most recent backups per source (use --detailed to see all)
+- With --history flag, shows the backup records stored in the config file
 
 ### Other Commands
 
@@ -98,6 +109,13 @@ Other available commands include:
 ```bash
 # Run a backup
 go-backup run
+```
+
+The run command:
+- Creates a compressed backup of the specified source directory
+- Copies the backup to all configured targets
+- Performs backup rotation based on maxBackups setting
+- Updates the backup history in the configuration file
 
 # Initialize a configuration file
 go-backup init

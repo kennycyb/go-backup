@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"time"
@@ -122,7 +121,7 @@ This command will package and compress the specified sources.`,
 			destFilePath := filepath.Join(dest, backupFileName)
 			fmt.Printf("  Copying file: %s\n", filepath.Base(destFilePath))
 
-			if err := copyFile(tempBackupPath, destFilePath); err != nil {
+			if err := backupService.CopyFile(tempBackupPath, destFilePath); err != nil {
 				fmt.Printf("  Error: failed to copy backup - %v\n", err)
 			} else {
 				fmt.Printf("  Success: backup copied successfully\n")
@@ -136,9 +135,9 @@ This command will package and compress the specified sources.`,
 						// Find the target that matches this destination
 						for _, target := range config.Targets {
 							if target.Path == dest {
-								if target.MaxBackups > 0 {
-									maxBackups = target.MaxBackups
-								}
+								// Always use maxBackups from target, as ReadBackupConfig
+								// already sets the default value of 7 if it was empty
+								maxBackups = target.MaxBackups
 								break
 							}
 						}
@@ -157,6 +156,31 @@ This command will package and compress the specified sources.`,
 					} else {
 						fmt.Printf("  Rotation: Keeping latest %d backups\n", maxBackups)
 					}
+
+					// Record this backup in the config file if we're using a config
+					if configErr == nil && configFile != "" {
+						// Get file information for size
+						fileInfo, err := os.Stat(destFilePath)
+						if err == nil {
+							// Create a backup record
+							backupRecord := configService.BackupRecord{
+								Filename:  filepath.Base(destFilePath),
+								Source:    source,
+								CreatedAt: time.Now(),
+								Size:      fileInfo.Size(),
+							}
+
+							// Add the record to the config
+							configService.AddBackupRecord(config, dest, backupRecord)
+
+							// Save updated config
+							if err := configService.WriteBackupConfig(configPath, config); err != nil {
+								fmt.Printf("  Warning: Failed to update backup history in config - %v\n", err)
+							} else {
+								fmt.Printf("  History: Updated backup history in %s\n", configPath)
+							}
+						}
+					}
 				}
 			}
 		}
@@ -165,32 +189,6 @@ This command will package and compress the specified sources.`,
 		os.Remove(tempBackupPath)
 		fmt.Println("\nBackup completed successfully!")
 	},
-}
-
-// copyFile copies a file from src to dst
-func copyFile(src, dst string) error {
-	// Open the source file
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return fmt.Errorf("error opening source file: %w", err)
-	}
-	defer srcFile.Close()
-
-	// Create the destination file
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return fmt.Errorf("error creating destination file: %w", err)
-	}
-	defer dstFile.Close()
-
-	// Copy the contents
-	_, err = io.Copy(dstFile, srcFile)
-	if err != nil {
-		return fmt.Errorf("error copying file: %w", err)
-	}
-
-	// Sync the file to ensure it's written to disk
-	return dstFile.Sync()
 }
 
 func init() {

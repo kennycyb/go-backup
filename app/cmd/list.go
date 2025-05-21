@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	detailed bool
-	listPath string
-	listAll  bool
+	detailed    bool
+	listPath    string
+	listAll     bool
+	showHistory bool
 )
 
 // Backup represents a backup file with metadata
@@ -36,6 +37,12 @@ var listCmd = &cobra.Command{
 This command will display information about existing backups.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Listing backups...")
+
+		// Handle history mode separately
+		if showHistory {
+			listBackupHistory()
+			return
+		}
 
 		// Get current directory name for filtering
 		currentDir := ""
@@ -291,11 +298,92 @@ func formatTimeAgo(t time.Time) string {
 	}
 }
 
+// listBackupHistory displays the backup history from the config file
+func listBackupHistory() {
+	// Read from config file
+	configPath := ".backup.yaml"
+	if configFile != "" { // Use global configFile var if set
+		configPath = configFile
+	}
+
+	config, err := configService.ReadBackupConfig(configPath)
+	if err != nil {
+		fmt.Printf("Error reading config file: %v\n", err)
+		return
+	}
+
+	// Check if any targets have backup history
+	hasHistory := false
+	for _, target := range config.Targets {
+		if len(target.Backups) > 0 {
+			hasHistory = true
+			break
+		}
+	}
+
+	if !hasHistory {
+		fmt.Println("No backup history found in config file.")
+		fmt.Println("History is recorded when backups are created with the config file specified.")
+		return
+	}
+
+	fmt.Println("\nBackup History from Config File:")
+
+	// Display backups by target
+	for _, target := range config.Targets {
+		if len(target.Backups) == 0 {
+			continue
+		}
+
+		fmt.Printf("\n📁 Location: %s\n", target.Path)
+
+		// Group backups by source
+		sourceGroups := make(map[string][]configService.BackupRecord)
+		for _, backup := range target.Backups {
+			sourceGroups[backup.Source] = append(sourceGroups[backup.Source], backup)
+		}
+
+		// Display each source group
+		for source, sourceBackups := range sourceGroups {
+			fmt.Printf("  📦 Source: %s (%d backups)\n", source, len(sourceBackups))
+
+			// Sort backups by creation time (newest first)
+			sort.Slice(sourceBackups, func(i, j int) bool {
+				return sourceBackups[i].CreatedAt.After(sourceBackups[j].CreatedAt)
+			})
+
+			for i, backup := range sourceBackups {
+				// Only show top 5 backups per source unless detailed is enabled
+				if !detailed && i >= 5 {
+					fmt.Printf("    ... and %d more (use --detailed to see all)\n", len(sourceBackups)-5)
+					break
+				}
+
+				// Format file size for human readability
+				sizeStr := formatSize(backup.Size)
+
+				if detailed {
+					// Detailed view
+					fmt.Printf("    • %s\n", backup.Filename)
+					fmt.Printf("      Size: %s\n", sizeStr)
+					fmt.Printf("      Created: %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
+					fmt.Println()
+				} else {
+					// Simple view
+					timeAgo := formatTimeAgo(backup.CreatedAt)
+					fmt.Printf("    • %s (%s, %s ago)\n", backup.Filename, sizeStr, timeAgo)
+				}
+			}
+		}
+	}
+}
+
 func init() {
 	// Local flags for the list command
 	listCmd.Flags().BoolVarP(&detailed, "detailed", "d", false, "Show detailed information")
 	listCmd.Flags().StringVarP(&listPath, "path", "p", "", "Custom path to search for backups")
 	listCmd.Flags().BoolVarP(&listAll, "all", "a", false, "List all backups, not just those from current directory")
+	listCmd.Flags().BoolVar(&showHistory, "history", false, "Show backup history from config file instead of scanning directories")
 
 	// Add command to root
 	rootCmd.AddCommand(listCmd)

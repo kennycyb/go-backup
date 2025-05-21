@@ -1,8 +1,10 @@
 package config_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	. "github.com/kennycyb/go-backup/internal/service/config"
 	. "github.com/onsi/ginkgo/v2"
@@ -10,6 +12,131 @@ import (
 )
 
 var _ = Describe("Config", func() {
+	Describe("AddBackupRecord", func() {
+		It("should add a backup record to an existing target", func() {
+			// Create a config with a target
+			config := &BackupConfig{
+				Targets: []BackupTarget{
+					{
+						Path:       "/backup/path",
+						MaxBackups: 3,
+						Backups:    []BackupRecord{},
+					},
+				},
+			}
+
+			// Create a test backup record
+			record := BackupRecord{
+				Filename:  "test-backup-20230101.tar.gz",
+				Source:    "/source/path",
+				CreatedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+				Size:      1024,
+			}
+
+			// Add the record
+			AddBackupRecord(config, "/backup/path", record)
+
+			// Check that the record was added
+			Expect(config.Targets[0].Backups).To(HaveLen(1))
+			Expect(config.Targets[0].Backups[0].Filename).To(Equal("test-backup-20230101.tar.gz"))
+		})
+
+		It("should prepend new backups and respect maxBackups limit", func() {
+			// Create a config with a target that already has some backups
+			config := &BackupConfig{
+				Targets: []BackupTarget{
+					{
+						Path:       "/backup/path",
+						MaxBackups: 2,
+						Backups: []BackupRecord{
+							{
+								Filename:  "test-backup-20230101.tar.gz",
+								CreatedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+							{
+								Filename:  "test-backup-20230102.tar.gz",
+								CreatedAt: time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
+							},
+						},
+					},
+				},
+			}
+
+			// Create a test backup record
+			record := BackupRecord{
+				Filename:  "test-backup-20230103.tar.gz",
+				Source:    "/source/path",
+				CreatedAt: time.Date(2023, 1, 3, 12, 0, 0, 0, time.UTC),
+				Size:      1024,
+			}
+
+			// Add the record
+			AddBackupRecord(config, "/backup/path", record)
+
+			// Check that we still have only 2 records (due to maxBackups)
+			Expect(config.Targets[0].Backups).To(HaveLen(2))
+
+			// Check that the new record is at the beginning
+			Expect(config.Targets[0].Backups[0].Filename).To(Equal("test-backup-20230103.tar.gz"))
+			Expect(config.Targets[0].Backups[1].Filename).To(Equal("test-backup-20230101.tar.gz"))
+		})
+
+		It("should do nothing when target is not found", func() {
+			// Create a config with a target
+			config := &BackupConfig{
+				Targets: []BackupTarget{
+					{
+						Path:       "/backup/path",
+						MaxBackups: 3,
+						Backups:    []BackupRecord{},
+					},
+				},
+			}
+
+			// Create a test backup record
+			record := BackupRecord{
+				Filename:  "test-backup-20230101.tar.gz",
+				Source:    "/source/path",
+				CreatedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+				Size:      1024,
+			}
+
+			// Add the record to a non-existent target
+			AddBackupRecord(config, "/nonexistent/path", record)
+
+			// Check that no records were added
+			Expect(config.Targets[0].Backups).To(HaveLen(0))
+		})		It("should set the default maxBackups value when adding to a target with 0 maxBackups", func() {
+			// Create a config with a target that has zero maxBackups
+			config := &BackupConfig{
+				Targets: []BackupTarget{
+					{
+						Path:       "/backup/path",
+						MaxBackups: 0, // Zero value should be replaced with default
+						Backups:    []BackupRecord{},
+					},
+				},
+			}
+
+			// Add backup records
+			for i := 1; i <= 10; i++ {
+				record := BackupRecord{
+					Filename:  fmt.Sprintf("test-backup-%d.tar.gz", i),
+					Source:    "/source/path",
+					CreatedAt: time.Now().AddDate(0, 0, -i),
+					Size:      int64(i * 1000),
+				}
+				AddBackupRecord(config, "/backup/path", record)
+			}
+
+			// Should have set MaxBackups to 7 and limited the backups
+			Expect(config.Targets[0].MaxBackups).To(Equal(7))
+			Expect(config.Targets[0].Backups).To(HaveLen(7))
+
+			// First backup in the list should be the most recently added one (10)
+			Expect(config.Targets[0].Backups[0].Filename).To(Equal("test-backup-10.tar.gz"))
+		})
+	})
 	var (
 		tmpDir     string
 		configPath string
@@ -61,6 +188,32 @@ target:
 				Expect(config.Targets[0].MaxBackups).To(Equal(5))
 				Expect(config.Targets[1].Path).To(Equal("/path/to/backup/location2"))
 				Expect(config.Targets[1].MaxBackups).To(Equal(10))
+			})
+
+			It("should apply default maxBackups value of 7 when missing", func() {
+				// Create a valid config file with a missing maxBackups value
+				configContent := `
+excludes:
+  - ".git/**"
+target:
+  - path: "/path/to/backup/location1"
+    maxBackups: 5
+  - path: "/path/to/backup/location2"
+  - path: "/path/to/backup/location3"
+    maxBackups: 0
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config).NotTo(BeNil())
+
+				// Verify default values are applied
+				Expect(config.Targets).To(HaveLen(3))
+				Expect(config.Targets[0].MaxBackups).To(Equal(5)) // Specified value kept
+				Expect(config.Targets[1].MaxBackups).To(Equal(7)) // Default applied when missing
+				Expect(config.Targets[2].MaxBackups).To(Equal(7)) // Default applied when zero
 			})
 		})
 
@@ -119,10 +272,7 @@ target:
 			// Create a test config
 			config = &BackupConfig{
 				Excludes: []string{".git/**", "node_modules/**"},
-				Targets: []struct {
-					Path       string `yaml:"path"`
-					MaxBackups int    `yaml:"maxBackups"`
-				}{
+				Targets: []BackupTarget{
 					{
 						Path:       "/path/to/backup/location1",
 						MaxBackups: 5,
