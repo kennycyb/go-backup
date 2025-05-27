@@ -15,11 +15,25 @@
                 "editor.formatOnSave": true,
                 "editor.codeActionsOnSave": {
                     "source.organizeImports": true
+                },
+                "github.copilot.enable": {
+                    "*": true,
+                    "plaintext": false,
+                    "markdown": false,
+                    "scminput": false
+                },
+                "github.copilot.advanced": {
+                    "projectInstructionsPath": ".github/copilot-instructions.md",
+                    "codeStyle": {
+                        "path": "code-style.md"
+                    }
                 }
             },
             "extensions": [
                 "golang.Go",
-                "ms-vscode.makefile-tools"
+                "ms-vscode.makefile-tools",
+                "github.copilot",
+                "github.copilot-chat"
             ]
         }
     },

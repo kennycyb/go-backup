@@ -33,9 +33,9 @@ type EncryptionConfig struct {
 
 // BackupConfig represents the structure of the backup configuration file
 type BackupConfig struct {
-	Excludes   []string           `yaml:"excludes"`
-	Targets    []BackupTarget     `yaml:"target"`
-	Encryption []EncryptionConfig `yaml:"encryption,omitempty"`
+	Excludes   []string          `yaml:"excludes"`
+	Targets    []BackupTarget    `yaml:"target"`
+	Encryption *EncryptionConfig `yaml:"encryption,omitempty"`
 }
 
 // ReadBackupConfig reads the backup configuration from the specified file
@@ -77,7 +77,8 @@ func WriteBackupConfig(filePath string, config *BackupConfig) error {
 	}
 
 	// Add comment at the top of the YAML file
-	yamlData := []byte("# Backup configuration file\n")
+	yamlData := []byte("# Backup configuration file\n# WARNING: Do not manually edit this file unless you know what you're doing\n")
+	yamlData = append(yamlData, []byte("# Created/updated by go-backup on: "+time.Now().Format("2006-01-02 15:04:05")+"\n")...)
 	yamlData = append(yamlData, data...)
 
 	// Write the config to file

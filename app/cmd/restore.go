@@ -75,13 +75,10 @@ This command will extract and restore files from a backup archive.`,
 				if _, err := os.Stat(associatedConfigPath); err == nil {
 					// Read config to check for passphrase
 					config, err := configService.ReadBackupConfig(associatedConfigPath)
-					if err == nil && config != nil && len(config.Encryption) > 0 {
-						for _, encConfig := range config.Encryption {
-							if encConfig.Method == "gpg" && encConfig.Passphrase != "" {
-								configPassphrase = encConfig.Passphrase
-								fmt.Println("Using passphrase from config file")
-								break
-							}
+					if err == nil && config != nil && config.Encryption != nil {
+						if config.Encryption.Method == "gpg" && config.Encryption.Passphrase != "" {
+							configPassphrase = config.Encryption.Passphrase
+							fmt.Println("Using passphrase from config file")
 						}
 					}
 				}

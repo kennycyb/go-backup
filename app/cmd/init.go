@@ -23,7 +23,10 @@ in the current directory. This file will define backup targets and settings.`,
 
 		// Check if config file exists and overwrite flag is not set
 		if _, err := os.Stat(configFile); err == nil && !configOverwrite {
-			fmt.Printf("Configuration file '%s' already exists. Use --overwrite to replace it.\n", configFile)
+			fmt.Printf("⚠️ Warning: Configuration file '%s' already exists.\n", configFile)
+			fmt.Printf("To create a new config file and overwrite the existing one, use the --overwrite flag.\n")
+			fmt.Printf("Example: go-backup init --overwrite\n")
+			fmt.Printf("Your existing backup configuration has been preserved.\n")
 			return
 		}
 
@@ -36,12 +39,10 @@ in the current directory. This file will define backup targets and settings.`,
 					MaxBackups: 7,
 				},
 			},
-			Encryption: []configService.EncryptionConfig{
-				{
-					Method:     "gpg",
-					Receiver:   "user@example.com",
-					Passphrase: "", // Passphrase is empty by default for security reasons
-				},
+			Encryption: &configService.EncryptionConfig{
+				Method:     "gpg",
+				Receiver:   "user@example.com",
+				Passphrase: "", // Passphrase is empty by default for security reasons
 			},
 		}
 
