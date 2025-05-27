@@ -53,7 +53,9 @@ func GPGEncrypt(sourceFile, recipient string) (string, error) {
 
 // GPGDecrypt decrypts a file using GPG.
 // It returns the path to the decrypted file.
-func GPGDecrypt(encryptedFile, outputFile string) (string, error) {
+// If a passphrase is provided, it will be used for decryption.
+// If passphrase is empty, GPG will use the agent or prompt for a passphrase.
+func GPGDecrypt(encryptedFile, outputFile string, passphrase string) (string, error) {
 	// Ensure the encrypted file exists
 	if _, err := os.Stat(encryptedFile); err != nil {
 		return "", fmt.Errorf("encrypted file doesn't exist: %w", err)
@@ -69,28 +71,71 @@ func GPGDecrypt(encryptedFile, outputFile string) (string, error) {
 		}
 	}
 
-	// Build and execute gpg command
-	cmd := exec.Command("gpg", "--batch", "--yes", "--output", outputFile,
-		"--decrypt", encryptedFile)
+	var cmd *exec.Cmd
 
-	// Capture the standard error
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to get stderr pipe: %w", err)
-	}
+	if passphrase != "" {
+		// Use passphrase-fd=0 to read the passphrase from stdin
+		cmd = exec.Command("gpg", "--batch", "--yes", "--passphrase-fd", "0",
+			"--output", outputFile, "--decrypt", encryptedFile)
 
-	// Start the command
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start gpg command: %w", err)
-	}
+		// Create a pipe to send the passphrase
+		stdin, err := cmd.StdinPipe()
+		if err != nil {
+			return "", fmt.Errorf("failed to get stdin pipe: %w", err)
+		}
 
-	// Read the error output
-	errorOutput := make([]byte, 1024)
-	stderr.Read(errorOutput)
+		// Capture the standard error
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			stdin.Close()
+			return "", fmt.Errorf("failed to get stderr pipe: %w", err)
+		}
 
-	// Wait for the command to finish
-	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("gpg decryption failed: %w, details: %s", err, errorOutput)
+		// Start the command before writing to stdin
+		if err := cmd.Start(); err != nil {
+			stdin.Close()
+			return "", fmt.Errorf("failed to start gpg command: %w", err)
+		}
+
+		// Write the passphrase to stdin and close the pipe
+		_, err = stdin.Write([]byte(passphrase + "\n"))
+		if err != nil {
+			return "", fmt.Errorf("failed to write passphrase: %w", err)
+		}
+		stdin.Close()
+
+		// Read the error output
+		errorOutput := make([]byte, 1024)
+		stderr.Read(errorOutput)
+
+		// Wait for the command to finish
+		if err := cmd.Wait(); err != nil {
+			return "", fmt.Errorf("gpg decryption failed: %w, details: %s", err, errorOutput)
+		}
+	} else {
+		// Default command without passphrase support
+		cmd = exec.Command("gpg", "--batch", "--yes", "--output", outputFile,
+			"--decrypt", encryptedFile)
+
+		// Capture the standard error
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			return "", fmt.Errorf("failed to get stderr pipe: %w", err)
+		}
+
+		// Start the command
+		if err := cmd.Start(); err != nil {
+			return "", fmt.Errorf("failed to start gpg command: %w", err)
+		}
+
+		// Read the error output
+		errorOutput := make([]byte, 1024)
+		stderr.Read(errorOutput)
+
+		// Wait for the command to finish
+		if err := cmd.Wait(); err != nil {
+			return "", fmt.Errorf("gpg decryption failed: %w, details: %s", err, errorOutput)
+		}
 	}
 
 	// Verify the decrypted file was created

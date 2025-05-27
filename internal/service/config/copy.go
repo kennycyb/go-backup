@@ -42,6 +42,18 @@ func CopyConfigWithHelp(sourcePath, destPath string, encryptEnabled bool, encryp
 		helpComments += "#\n"
 		helpComments += "#   Or let go-backup handle decryption:\n"
 		helpComments += "#     go-backup restore --file backup.tar.gz.gpg\n"
+
+		// If the config contains a passphrase, add guidance
+		if strings.Contains(content, "passphrase:") && strings.Contains(content, "method: gpg") {
+			helpComments += "#\n"
+			helpComments += "#   A passphrase is stored in this config file and will be used automatically.\n"
+			helpComments += "#   To override with a different passphrase:\n"
+			helpComments += "#     go-backup restore --file backup.tar.gz.gpg --passphrase \"your-passphrase\"\n"
+		} else {
+			helpComments += "#\n"
+			helpComments += "#   If a passphrase is required:\n"
+			helpComments += "#     go-backup restore --file backup.tar.gz.gpg --ask-passphrase\n"
+		}
 		helpComments += "#\n"
 	}
 

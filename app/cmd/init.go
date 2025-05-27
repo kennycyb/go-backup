@@ -38,8 +38,9 @@ in the current directory. This file will define backup targets and settings.`,
 			},
 			Encryption: []configService.EncryptionConfig{
 				{
-					Method:   "gpg",
-					Receiver: "user@example.com",
+					Method:     "gpg",
+					Receiver:   "user@example.com",
+					Passphrase: "", // Passphrase is empty by default for security reasons
 				},
 			},
 		}

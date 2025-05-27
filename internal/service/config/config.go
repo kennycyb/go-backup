@@ -26,8 +26,9 @@ type BackupTarget struct {
 
 // EncryptionConfig represents the encryption configuration
 type EncryptionConfig struct {
-	Method   string `yaml:"method"`
-	Receiver string `yaml:"receiver"`
+	Method     string `yaml:"method"`
+	Receiver   string `yaml:"receiver"`
+	Passphrase string `yaml:"passphrase,omitempty"`
 }
 
 // BackupConfig represents the structure of the backup configuration file

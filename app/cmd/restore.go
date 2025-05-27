@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	configService "github.com/kennycyb/go-backup/internal/service/config"
 	encryptionService "github.com/kennycyb/go-backup/internal/service/encrypt"
 	"github.com/spf13/cobra"
 )
@@ -16,6 +17,8 @@ var (
 	overwrite     bool
 	decrypt       bool
 	useConfigFile bool
+	passphrase    string
+	askPassphrase bool
 )
 
 // restoreCmd represents the restore command
@@ -66,11 +69,59 @@ This command will extract and restore files from a backup archive.`,
 				tempOutputFile = tempOutputFile[:len(tempOutputFile)-4]
 			}
 
+			// Check for passphrase in config if useConfigFile is true
+			configPassphrase := ""
+			if useConfigFile && passphrase == "" && !askPassphrase {
+				if _, err := os.Stat(associatedConfigPath); err == nil {
+					// Read config to check for passphrase
+					config, err := configService.ReadBackupConfig(associatedConfigPath)
+					if err == nil && config != nil && len(config.Encryption) > 0 {
+						for _, encConfig := range config.Encryption {
+							if encConfig.Method == "gpg" && encConfig.Passphrase != "" {
+								configPassphrase = encConfig.Passphrase
+								fmt.Println("Using passphrase from config file")
+								break
+							}
+						}
+					}
+				}
+			}
+
+			// If askPassphrase flag is set, prompt for passphrase
+			promptedPassphrase := ""
+			if askPassphrase && passphrase == "" {
+				fmt.Print("Enter passphrase for GPG decryption: ")
+				fmt.Scanln(&promptedPassphrase)
+			}
+
+			// Use provided passphrase, prompted passphrase, or config passphrase
+			finalPassphrase := passphrase
+			if finalPassphrase == "" {
+				finalPassphrase = promptedPassphrase
+			}
+			if finalPassphrase == "" {
+				finalPassphrase = configPassphrase
+			}
+
 			// Decrypt the backup file
-			decryptedPath, err := encryptionService.GPGDecrypt(backupFile, tempOutputFile)
+			decryptedPath, err := encryptionService.GPGDecrypt(backupFile, tempOutputFile, finalPassphrase)
 			if err != nil {
-				fmt.Printf("Error decrypting backup: %v\n", err)
-				os.Exit(1)
+				// If decryption failed and we didn't explicitly ask for the passphrase, try prompting
+				if finalPassphrase == "" && !askPassphrase {
+					fmt.Println("Decryption failed, passphrase may be required.")
+					fmt.Print("Enter passphrase for GPG decryption: ")
+					fmt.Scanln(&promptedPassphrase)
+
+					// Retry decryption with the entered passphrase
+					decryptedPath, err = encryptionService.GPGDecrypt(backupFile, tempOutputFile, promptedPassphrase)
+					if err != nil {
+						fmt.Printf("Error decrypting backup: %v\n", err)
+						os.Exit(1)
+					}
+				} else {
+					fmt.Printf("Error decrypting backup: %v\n", err)
+					os.Exit(1)
+				}
 			}
 
 			fmt.Printf("Decrypted to: %s\n", decryptedPath)
@@ -94,6 +145,8 @@ func init() {
 	restoreCmd.Flags().BoolVarP(&overwrite, "overwrite", "o", false, "Overwrite existing files")
 	restoreCmd.Flags().BoolVarP(&decrypt, "decrypt", "d", false, "Force decrypt the backup file (auto-detected for .gpg files)")
 	restoreCmd.Flags().BoolVar(&useConfigFile, "use-config", true, "Use the associated backup configuration file if found")
+	restoreCmd.Flags().StringVar(&passphrase, "passphrase", "", "Passphrase for GPG decryption (if needed)")
+	restoreCmd.Flags().BoolVar(&askPassphrase, "ask-passphrase", false, "Prompt for a passphrase")
 
 	// Mark required flags
 	restoreCmd.MarkFlagRequired("file")
