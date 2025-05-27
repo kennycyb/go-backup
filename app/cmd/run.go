@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	backupService "github.com/kennycyb/go-backup/internal/service/backup"
 	compressionService "github.com/kennycyb/go-backup/internal/service/compress"
 	configService "github.com/kennycyb/go-backup/internal/service/config"
+	encryptionService "github.com/kennycyb/go-backup/internal/service/encrypt"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +20,9 @@ var (
 	compress    bool
 	configFile  string
 	excludeDirs []string
+	encrypt     bool
+	encryptTo   string
+	copyConfig  bool
 )
 
 // runCmd represents the run command (previously backup command)
@@ -83,6 +88,48 @@ This command will package and compress the specified sources.`,
 		if err != nil {
 			fmt.Printf("Error creating backup archive: %v\n", err)
 			os.Exit(1)
+		}
+
+		// Handle encryption if requested or configured
+		useEncryption := encrypt
+		encryptionReceiver := encryptTo
+
+		// If not explicitly set via command line, check config
+		if !useEncryption && config != nil && len(config.Encryption) > 0 {
+			for _, encConfig := range config.Encryption {
+				if encConfig.Method == "gpg" {
+					useEncryption = true
+					if encryptionReceiver == "" {
+						encryptionReceiver = encConfig.Receiver
+					}
+					break
+				}
+			}
+		}
+
+		// Apply encryption if enabled
+		if useEncryption {
+			if encryptionReceiver == "" {
+				fmt.Println("Error: GPG encryption enabled but no recipient specified")
+				fmt.Println("Please specify a recipient using --encrypt-to flag or in the config file")
+				os.Exit(1)
+			}
+
+			fmt.Printf("Encrypting backup with GPG for recipient: %s\n", encryptionReceiver) // Encrypt the temporary backup file
+			encryptedPath, err := encryptionService.GPGEncrypt(tempBackupPath, encryptionReceiver)
+			if err != nil {
+				fmt.Printf("Error encrypting backup: %v\n", err)
+				os.Exit(1)
+			}
+
+			// Remove the original unencrypted file
+			os.Remove(tempBackupPath)
+
+			// Update the temporary backup path to point to the encrypted file
+			tempBackupPath = encryptedPath
+
+			// Update the backup filename to include .gpg extension
+			backupFileName = backupFileName + ".gpg"
 		}
 
 		// Determine destinations from config or command line argument
@@ -179,6 +226,24 @@ This command will package and compress the specified sources.`,
 							} else {
 								fmt.Printf("  History: Updated backup history in %s\n", configPath)
 							}
+
+							// Copy the config file to the destination with backup name prefix if enabled
+							if copyConfig {
+								configBaseName := filepath.Base(backupFileName)
+								configBaseName = strings.TrimSuffix(configBaseName, ".tar.gz") // Remove .tar.gz
+								configBaseName = strings.TrimSuffix(configBaseName, ".gpg")    // Remove .gpg if encrypted
+								destConfigPath := filepath.Join(dest, configBaseName+".backup.yaml")
+
+								// Get the encryption receiver if encryption was used
+								currentEncryptionReceiver := encryptionReceiver
+
+								// Copy the config with added helpful comments
+								if err := configService.CopyConfigWithHelp(configPath, destConfigPath, useEncryption, currentEncryptionReceiver); err != nil {
+									fmt.Printf("  Warning: Failed to copy config file to destination - %v\n", err)
+								} else {
+									fmt.Printf("  Config: Copied config file with usage info to %s\n", destConfigPath)
+								}
+							}
 						}
 					}
 				}
@@ -197,7 +262,10 @@ func init() {
 	runCmd.Flags().StringVarP(&destination, "dest", "d", "", "Destination directory for backup (if not specified, uses config file)")
 	runCmd.Flags().BoolVarP(&compress, "compress", "c", true, "Compress the backup")
 	runCmd.Flags().StringVarP(&configFile, "config", "f", ".backup.yaml", "Config file path")
+	runCmd.Flags().BoolVarP(&encrypt, "encrypt", "e", false, "Encrypt the backup using GPG")
+	runCmd.Flags().StringVar(&encryptTo, "encrypt-to", "", "GPG recipient email for encryption (defaults to config value)")
 	runCmd.Flags().StringSliceVar(&excludeDirs, "exclude", []string{".git", "node_modules", "bin"}, "Directories to exclude from backup")
+	runCmd.Flags().BoolVar(&copyConfig, "copy-config", true, "Copy the config file to the target directories with the same name prefix as the backup")
 
 	// Add command to root
 	rootCmd.AddCommand(runCmd)

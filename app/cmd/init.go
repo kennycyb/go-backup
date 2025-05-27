@@ -36,6 +36,12 @@ in the current directory. This file will define backup targets and settings.`,
 					MaxBackups: 7,
 				},
 			},
+			Encryption: []configService.EncryptionConfig{
+				{
+					Method:   "gpg",
+					Receiver: "user@example.com",
+				},
+			},
 		}
 
 		// Write the config to file

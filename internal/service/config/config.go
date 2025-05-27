@@ -24,10 +24,17 @@ type BackupTarget struct {
 	Backups    []BackupRecord `yaml:"backups,omitempty"`
 }
 
+// EncryptionConfig represents the encryption configuration
+type EncryptionConfig struct {
+	Method   string `yaml:"method"`
+	Receiver string `yaml:"receiver"`
+}
+
 // BackupConfig represents the structure of the backup configuration file
 type BackupConfig struct {
-	Excludes []string       `yaml:"excludes"`
-	Targets  []BackupTarget `yaml:"target"`
+	Excludes   []string           `yaml:"excludes"`
+	Targets    []BackupTarget     `yaml:"target"`
+	Encryption []EncryptionConfig `yaml:"encryption,omitempty"`
 }
 
 // ReadBackupConfig reads the backup configuration from the specified file

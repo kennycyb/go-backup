@@ -62,7 +62,7 @@ var _ = Describe("Backup", func() {
 				createTestFile(testPrefix+"-20240102-120000.tar.gz", now.Add(-9*24*time.Hour))
 				createTestFile(testPrefix+"-20240103-120000.tar.gz", now.Add(-8*24*time.Hour))
 				createTestFile(testPrefix+"-20240104-120000.tar.gz", now.Add(-7*24*time.Hour))
-				createTestFile(testPrefix+"-20240105-120000.tar.gz", now.Add(-6*24*time.Hour))  // Newest
+				createTestFile(testPrefix+"-20240105-120000.tar.gz", now.Add(-6*24*time.Hour)) // Newest
 
 				// Should keep only the 3 newest backups
 				err := CleanupOldBackups(tmpDir, testPrefix+"-", 3)
@@ -81,13 +81,13 @@ var _ = Describe("Backup", func() {
 				Expect(remainingFiles).To(HaveLen(3))
 
 				// These should be the newer files
-				Expect(remainingFiles).To(ContainElement(testPrefix+"-20240103-120000.tar.gz"))
-				Expect(remainingFiles).To(ContainElement(testPrefix+"-20240104-120000.tar.gz"))
-				Expect(remainingFiles).To(ContainElement(testPrefix+"-20240105-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240104-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240105-120000.tar.gz"))
 
 				// The oldest files should be deleted
-				Expect(remainingFiles).NotTo(ContainElement(testPrefix+"-20240101-120000.tar.gz"))
-				Expect(remainingFiles).NotTo(ContainElement(testPrefix+"-20240102-120000.tar.gz"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.tar.gz"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240102-120000.tar.gz"))
 			})
 		})
 
@@ -140,15 +140,105 @@ var _ = Describe("Backup", func() {
 				Expect(remainingFiles).To(HaveLen(4))
 
 				// Should have kept the 2 newest from the target prefix
-				Expect(remainingFiles).To(ContainElement(testPrefix+"-20240102-120000.tar.gz"))
-				Expect(remainingFiles).To(ContainElement(testPrefix+"-20240103-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240102-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.tar.gz"))
 
 				// Should have deleted the oldest from the target prefix
-				Expect(remainingFiles).NotTo(ContainElement(testPrefix+"-20240101-120000.tar.gz"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.tar.gz"))
 
 				// Should not have touched files with different prefixes
 				Expect(remainingFiles).To(ContainElement("other-prefix-20240101-120000.tar.gz"))
 				Expect(remainingFiles).To(ContainElement("other-prefix-20240102-120000.tar.gz"))
+			})
+		})
+
+		Context("when there are associated config files", func() {
+			It("deletes both backups and their associated config files", func() {
+				now := time.Now()
+
+				// Create some backup files with different timestamps
+				createTestFile(testPrefix+"-20240101-120000.tar.gz", now.Add(-10*24*time.Hour)) // Oldest - to be deleted
+				createTestFile(testPrefix+"-20240102-120000.tar.gz", now.Add(-9*24*time.Hour))  // To be deleted
+				createTestFile(testPrefix+"-20240103-120000.tar.gz", now.Add(-8*24*time.Hour))  // Keep
+				createTestFile(testPrefix+"-20240104-120000.tar.gz", now.Add(-7*24*time.Hour))  // Keep
+				createTestFile(testPrefix+"-20240105-120000.tar.gz", now.Add(-6*24*time.Hour))  // Keep - Newest
+
+				// Create associated config files for each backup
+				createTestFile(testPrefix+"-20240101-120000.backup.yaml", now.Add(-10*24*time.Hour)) // Should be deleted
+				createTestFile(testPrefix+"-20240102-120000.backup.yaml", now.Add(-9*24*time.Hour))  // Should be deleted
+				createTestFile(testPrefix+"-20240103-120000.backup.yaml", now.Add(-8*24*time.Hour))  // Should be kept
+				createTestFile(testPrefix+"-20240104-120000.backup.yaml", now.Add(-7*24*time.Hour))  // Should be kept
+				createTestFile(testPrefix+"-20240105-120000.backup.yaml", now.Add(-6*24*time.Hour))  // Should be kept
+
+				// Should keep only the 3 newest backups and their config files
+				err := CleanupOldBackups(tmpDir, testPrefix+"-", 3)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Check the files in the directory
+				files, err := os.ReadDir(tmpDir)
+				Expect(err).NotTo(HaveOccurred())
+
+				var remainingFiles []string
+				for _, file := range files {
+					remainingFiles = append(remainingFiles, file.Name())
+				}
+
+				// We should have 6 files left: 3 backup files and 3 config files
+				Expect(remainingFiles).To(HaveLen(6))
+
+				// These should be the newer files - both backups and configs
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240104-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240105-120000.tar.gz"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.backup.yaml"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240104-120000.backup.yaml"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240105-120000.backup.yaml"))
+
+				// The oldest files should be deleted - both backups and configs
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.tar.gz"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240102-120000.tar.gz"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.backup.yaml"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240102-120000.backup.yaml"))
+			})
+
+			It("handles encrypted backups with .gpg extension", func() {
+				now := time.Now()
+
+				// Create some encrypted backup files with different timestamps
+				createTestFile(testPrefix+"-20240101-120000.tar.gz.gpg", now.Add(-10*24*time.Hour)) // Oldest - to be deleted
+				createTestFile(testPrefix+"-20240102-120000.tar.gz.gpg", now.Add(-9*24*time.Hour))  // To be deleted
+				createTestFile(testPrefix+"-20240103-120000.tar.gz.gpg", now.Add(-8*24*time.Hour))  // Keep
+
+				// Create associated config files for each backup
+				createTestFile(testPrefix+"-20240101-120000.backup.yaml", now.Add(-10*24*time.Hour)) // Should be deleted
+				createTestFile(testPrefix+"-20240102-120000.backup.yaml", now.Add(-9*24*time.Hour))  // Should be deleted
+				createTestFile(testPrefix+"-20240103-120000.backup.yaml", now.Add(-8*24*time.Hour))  // Should be kept
+
+				// Should keep only the newest backup and its config file
+				err := CleanupOldBackups(tmpDir, testPrefix+"-", 1)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Check the files in the directory
+				files, err := os.ReadDir(tmpDir)
+				Expect(err).NotTo(HaveOccurred())
+
+				var remainingFiles []string
+				for _, file := range files {
+					remainingFiles = append(remainingFiles, file.Name())
+				}
+
+				// We should have 2 files left: 1 encrypted backup file and 1 config file
+				Expect(remainingFiles).To(HaveLen(2))
+
+				// These should be the newer files - both encrypted backup and config
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.tar.gz.gpg"))
+				Expect(remainingFiles).To(ContainElement(testPrefix + "-20240103-120000.backup.yaml"))
+
+				// The oldest files should be deleted - both encrypted backups and configs
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.tar.gz.gpg"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240102-120000.tar.gz.gpg"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240101-120000.backup.yaml"))
+				Expect(remainingFiles).NotTo(ContainElement(testPrefix + "-20240102-120000.backup.yaml"))
 			})
 		})
 	})
