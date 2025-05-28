@@ -36,7 +36,20 @@ var listCmd = &cobra.Command{
 	Long: `List all available backups with their metadata.
 This command will display information about existing backups.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Listing backups...")
+		// Color and emoji constants (reuse from status.go if available)
+		const (
+			ColorReset  = "\033[0m"
+			ColorRed    = "\033[31m"
+			ColorGreen  = "\033[32m"
+			ColorYellow = "\033[33m"
+			ColorBlue   = "\033[34m"
+			ColorCyan   = "\033[36m"
+			ColorWhite  = "\033[37m"
+			ColorBold   = "\033[1m"
+			ColorDim    = "\033[2m"
+		)
+
+		fmt.Printf("%s%s\n==============================\n   📦  Backup List           \n==============================%s\n", ColorCyan, ColorBold, ColorReset)
 
 		// Handle history mode separately
 		if showHistory {
@@ -60,7 +73,7 @@ This command will display information about existing backups.`,
 					currentDir = "go-backup"
 				}
 			}
-			fmt.Printf("Filtering backups for source: %s\n", currentDir)
+			fmt.Printf("%sFiltering backups for source:%s %s\n", ColorDim, ColorReset, currentDir)
 		}
 
 		// Determine backup locations to scan
@@ -94,13 +107,12 @@ This command will display information about existing backups.`,
 		// List backups in all locations
 		locationGroups := make(map[string][]Backup)
 
-		fmt.Println("\nScanning backup locations:")
+		fmt.Printf("\n%s%sScanning backup locations:%s\n", ColorCyan, ColorBold, ColorReset)
 		for _, location := range backupLocations {
-			fmt.Printf("→ %s\n", location)
-
+			fmt.Printf("%s→ %s%s\n", ColorBlue, location, ColorReset)
 			// Check if location exists
 			if _, err := os.Stat(location); os.IsNotExist(err) {
-				fmt.Printf("  Directory does not exist, skipping\n")
+				fmt.Printf("  %s⚠️  Directory does not exist, skipping%s\n", ColorYellow, ColorReset)
 				continue
 			}
 
@@ -113,7 +125,7 @@ This command will display information about existing backups.`,
 
 			// Store backups by location
 			locationGroups[location] = backups
-			fmt.Printf("  Found %d backups\n", len(backups))
+			fmt.Printf("  %sFound %d backups%s\n", ColorDim, len(backups), ColorReset)
 		}
 
 		// Check if we found any backups
@@ -124,24 +136,23 @@ This command will display information about existing backups.`,
 
 		if totalBackups == 0 {
 			if listAll {
-				fmt.Println("\nNo backups found.")
+				fmt.Printf("\n%s%sNo backups found.%s\n", ColorYellow, ColorBold, ColorReset)
 			} else {
-				fmt.Printf("\nNo backups found for source '%s'.\n", currentDir)
-				fmt.Println("Use --all flag to list all backups regardless of source.")
+				fmt.Printf("\n%s%sNo backups found for source '%s'.%s\n", ColorYellow, ColorBold, currentDir, ColorReset)
+				fmt.Printf("%sUse --all flag to list all backups regardless of source.%s\n", ColorDim, ColorReset)
 			}
 			return
 		}
 
 		if listAll {
-			fmt.Printf("\nFound %d backups across %d locations:\n", totalBackups, len(locationGroups))
+			fmt.Printf("\n%sFound %d backups across %d locations:%s\n", ColorGreen, totalBackups, len(locationGroups), ColorReset)
 		} else {
-			fmt.Printf("\nFound %d backups for source '%s' across %d locations:\n",
-				totalBackups, currentDir, len(locationGroups))
+			fmt.Printf("\n%sFound %d backups for source '%s' across %d locations:%s\n", ColorGreen, totalBackups, currentDir, len(locationGroups), ColorReset)
 		}
 
 		// Display backups by location
 		for location, backups := range locationGroups {
-			fmt.Printf("\n📁 Location: %s\n", location)
+			fmt.Printf("\n%s📁 Location:%s %s\n", ColorBlue, ColorReset, location)
 
 			// Sort backups by creation time (newest first)
 			sort.Slice(backups, func(i, j int) bool {
@@ -156,11 +167,11 @@ This command will display information about existing backups.`,
 
 			// Display each source group
 			for source, sourceBackups := range sourceGroups {
-				fmt.Printf("  📦 Source: %s (%d backups)\n", source, len(sourceBackups))
+				fmt.Printf("  %s📦 Source:%s %s (%d backups)\n", ColorCyan, ColorReset, source, len(sourceBackups))
 				for i, backup := range sourceBackups {
 					// Only show top 5 backups per source unless detailed is enabled
 					if !detailed && i >= 5 {
-						fmt.Printf("    ... and %d more (use --detailed to see all)\n", len(sourceBackups)-5)
+						fmt.Printf("    %s... and %d more (use --detailed to see all)%s\n", ColorDim, len(sourceBackups)-5, ColorReset)
 						break
 					}
 
@@ -169,14 +180,14 @@ This command will display information about existing backups.`,
 
 					if detailed {
 						// Detailed view
-						fmt.Printf("    • %s\n", backup.Name)
-						fmt.Printf("      Size: %s\n", sizeStr)
-						fmt.Printf("      Created: %s\n", backup.CreatedAt.Format("2006-01-02 15:04:05"))
+						fmt.Printf("    %s•%s %s\n", ColorDim, ColorReset, backup.Name)
+						fmt.Printf("      %sSize:%s %s\n", ColorDim, ColorReset, sizeStr)
+						fmt.Printf("      %sCreated:%s %s\n", ColorDim, ColorReset, backup.CreatedAt.Format("2006-01-02 15:04:05"))
 						fmt.Println()
 					} else {
 						// Simple view
 						timeAgo := formatTimeAgo(backup.CreatedAt)
-						fmt.Printf("    • %s (%s, %s ago)\n", backup.Name, sizeStr, timeAgo)
+						fmt.Printf("    %s•%s %s %s(%s, %s ago)%s\n", ColorGreen, ColorReset, backup.Name, ColorDim, sizeStr, timeAgo, ColorReset)
 					}
 				}
 			}

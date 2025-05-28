@@ -2,269 +2,264 @@
 package cmd
 
 import (
-"fmt"
-"os"
-"path/filepath"
-"strings"
-"time"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
-backupService "github.com/kennycyb/go-backup/internal/service/backup"
-compressionService "github.com/kennycyb/go-backup/internal/service/compress"
-configService "github.com/kennycyb/go-backup/internal/service/config"
-encryptionService "github.com/kennycyb/go-backup/internal/service/encrypt"
-"github.com/spf13/cobra"
+	backupService "github.com/kennycyb/go-backup/internal/service/backup"
+	compressionService "github.com/kennycyb/go-backup/internal/service/compress"
+	configService "github.com/kennycyb/go-backup/internal/service/config"
+	encryptionService "github.com/kennycyb/go-backup/internal/service/encrypt"
+	"github.com/spf13/cobra"
 )
 
 var (
-source      string
-destination string
-compress    bool
-configFile  string
-excludeDirs []string
-encrypt     bool
-encryptTo   string
-copyConfig  bool
+	source      string
+	destination string
+	compress    bool
+	configFile  string
+	excludeDirs []string
+	encrypt     bool
+	encryptTo   string
+	copyConfig  bool
 )
 
 // runCmd represents the run command (previously backup command)
 var runCmd = &cobra.Command{
-Use:   "run",
-Short: "Create a new backup",
-Long: `Create a new backup of specified files or directories.
+	Use:   "run",
+	Short: "Create a new backup",
+	Long: `Create a new backup of specified files or directories.
 This command will package and compress the specified sources.`,
-Run: func(cmd *cobra.Command, args []string) {
-fmt.Println("Creating backup...")
+	Run: func(cmd *cobra.Command, args []string) {
+		// Color and emoji constants (reuse from status.go if available)
+		const (
+			ColorReset  = "\033[0m"
+			ColorRed    = "\033[31m"
+			ColorGreen  = "\033[32m"
+			ColorYellow = "\033[33m"
+			ColorBlue   = "\033[34m"
+			ColorCyan   = "\033[36m"
+			ColorWhite  = "\033[37m"
+			ColorBold   = "\033[1m"
+			ColorDim    = "\033[2m"
+		)
 
-// If source is empty, use current directory
-if source == "" {
-sourceDir, err := os.Getwd()
-if err != nil {
-fmt.Printf("Error getting current directory: %v\n", err)
-os.Exit(1)
-}
-source = sourceDir
-}
+		fmt.Printf("%s%s\n==============================\n   📦  Starting Backup Job    \n==============================%s\n", ColorCyan, ColorBold, ColorReset)
 
-// Create a timestamp for the backup file
-timestamp := time.Now().Format("20060102-150405")
+		// If source is empty, use current directory
+		if source == "" {
+			sourceDir, err := os.Getwd()
+			if err != nil {
+				fmt.Printf("%s%s❌ Error getting current directory:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+				os.Exit(1)
+			}
+			source = sourceDir
+		}
 
-// Get the current folder name for the backup file prefix
-currentDir := filepath.Base(source)
-if currentDir == "." || currentDir == "/" {
-// If source is the root directory or current directory symbol,
-// use "go-backup" as the default name
-currentDir = "go-backup"
-}
+		// Create a timestamp for the backup file
+		timestamp := time.Now().Format("20060102-150405")
 
-backupFileName := fmt.Sprintf("%s-%s.tar.gz", currentDir, timestamp)
-tempBackupPath := filepath.Join(os.TempDir(), backupFileName)
+		// Get the current folder name for the backup file prefix
+		currentDir := filepath.Base(source)
+		if currentDir == "." || currentDir == "/" {
+			currentDir = "go-backup"
+		}
 
-fmt.Printf("Source: %s\n", source)
-fmt.Printf("Backup name: %s\n", backupFileName)
-fmt.Printf("Temporary backup file: %s\n", tempBackupPath)
+		backupFileName := fmt.Sprintf("%s-%s.tar.gz", currentDir, timestamp)
+		tempBackupPath := filepath.Join(os.TempDir(), backupFileName)
 
-// Get excludes from config file
-configExcludes := []string{} // Default empty list
-var config *configService.BackupConfig
+		fmt.Printf("%sSource:%s %s\n", ColorDim, ColorReset, source)
+		fmt.Printf("%sBackup name:%s %s\n", ColorDim, ColorReset, backupFileName)
+		fmt.Printf("%sTemporary backup file:%s %s\n", ColorDim, ColorReset, tempBackupPath)
 
-// Read config file for excludes
-configPath := ".backup.yaml"
-if configFile != "" {
-configPath = configFile
-}
+		// Get excludes from config file
+		configExcludes := []string{} // Default empty list
+		var config *configService.BackupConfig
 
-var configErr error
-config, configErr = configService.ReadBackupConfig(configPath)
-if configErr != nil {
-fmt.Printf("Error reading config file %s: %v\n", configPath, configErr)
-os.Exit(1)
-}
+		// Read config file for excludes
+		configPath := ".backup.yaml"
+		if configFile != "" {
+			configPath = configFile
+		}
 
-if len(config.Excludes) > 0 {
-configExcludes = config.Excludes
-fmt.Printf("Using excludes from config: %v\n", configExcludes)
-} else {
-// If no config excludes, use the command line ones
-configExcludes = excludeDirs
-fmt.Printf("Using default excludes: %v\n", configExcludes)
-}
+		var configErr error
+		config, configErr = configService.ReadBackupConfig(configPath)
+		if configErr != nil {
+			fmt.Printf("Error reading config file %s: %v\n", configPath, configErr)
+			os.Exit(1)
+		}
 
-// Create the tar.gz archive using the compression service
-err := compressionService.CreateTarGzArchive(source, tempBackupPath, configExcludes)
-if err != nil {
-fmt.Printf("Error creating backup archive: %v\n", err)
-os.Exit(1)
-}
+		if len(config.Excludes) > 0 {
+			configExcludes = config.Excludes
+			fmt.Printf("%sUsing excludes from config:%s %v\n", ColorDim, ColorReset, configExcludes)
+		} else {
+			configExcludes = excludeDirs
+			fmt.Printf("%sUsing default excludes:%s %v\n", ColorDim, ColorReset, configExcludes)
+		}
 
-// Handle encryption if requested or configured
-useEncryption := encrypt
-encryptionReceiver := encryptTo // If not explicitly set via command line, check config
-if !useEncryption && config != nil && config.Encryption != nil {
-if config.Encryption.Method == "gpg" {
-useEncryption = true
-if encryptionReceiver == "" {
-encryptionReceiver = config.Encryption.Receiver
-}
-}
-}
+		// Create the tar.gz archive using the compression service
+		err := compressionService.CreateTarGzArchive(source, tempBackupPath, configExcludes)
+		if err != nil {
+			fmt.Printf("%s%s❌ Error creating backup archive:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+			os.Exit(1)
+		}
 
-// Apply encryption if enabled
-if useEncryption {
-if encryptionReceiver == "" {
-fmt.Println("Error: GPG encryption enabled but no recipient specified")
-fmt.Println("Please specify a recipient using --encrypt-to flag or in the config file")
-os.Exit(1)
-}
+		// Handle encryption if requested or configured
+		useEncryption := encrypt
+		encryptionReceiver := encryptTo
+		if !useEncryption && config != nil && config.Encryption != nil {
+			if config.Encryption.Method == "gpg" {
+				useEncryption = true
+				if encryptionReceiver == "" {
+					encryptionReceiver = config.Encryption.Receiver
+				}
+			}
+		}
 
-fmt.Printf("Encrypting backup with GPG for recipient: %s\n", encryptionReceiver)
-// Encrypt the temporary backup file
-encryptedPath, err := encryptionService.GPGEncrypt(tempBackupPath, encryptionReceiver)
-if err != nil {
-fmt.Printf("Error encrypting backup: %v\n", err)
-os.Exit(1)
-}
+		// Apply encryption if enabled
+		if useEncryption {
+			if encryptionReceiver == "" {
+				fmt.Printf("%s%s❌ Error:%s GPG encryption enabled but no recipient specified\n", ColorRed, ColorBold, ColorReset)
+				fmt.Println("Please specify a recipient using --encrypt-to flag or in the config file")
+				os.Exit(1)
+			}
 
-// Remove the original unencrypted file
-os.Remove(tempBackupPath)
+			fmt.Printf("%s🔒 Encrypting backup with GPG for recipient:%s %s\n", ColorYellow, ColorReset, encryptionReceiver)
+			// Encrypt the temporary backup file
+			encryptedPath, err := encryptionService.GPGEncrypt(tempBackupPath, encryptionReceiver)
+			if err != nil {
+				fmt.Printf("%s%s❌ Error encrypting backup:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+				os.Exit(1)
+			}
 
-// Update the temporary backup path to point to the encrypted file
-tempBackupPath = encryptedPath
+			os.Remove(tempBackupPath)
+			tempBackupPath = encryptedPath
+			backupFileName = backupFileName + ".gpg"
+		}
 
-// Update the backup filename to include .gpg extension
-backupFileName = backupFileName + ".gpg"
-}
+		// Determine destinations from config or command line argument
+		destinations := []string{}
+		if destination != "" {
+			destinations = append(destinations, destination)
+		} else {
+			for _, target := range config.Targets {
+				destinations = append(destinations, target.Path)
+			}
+			if len(destinations) == 0 {
+				fmt.Printf("%s%s❌ Error:%s No backup destinations found in config file and no destination specified\n", ColorRed, ColorBold, ColorReset)
+				os.Exit(1)
+			}
+		}
 
-// Determine destinations from config or command line argument
-destinations := []string{}
+		fmt.Printf("\n%s%sProcessing backup destinations:%s\n", ColorCyan, ColorBold, ColorReset)
+		for _, dest := range destinations {
+			fmt.Printf("\n%s→ Destination:%s %s\n", ColorBlue, ColorReset, dest)
+			if _, err := os.Stat(dest); os.IsNotExist(err) {
+				fmt.Printf("  %s⚠️  Skipping: directory does not exist%s\n", ColorYellow, ColorReset)
+				continue
+			}
 
-if destination != "" {
-// If destination is specified via command line
-destinations = append(destinations, destination)
-} else {
-// Use the config we already loaded
-// Note: We've already checked for config errors above
-// Use destinations from config
-for _, target := range config.Targets {
-destinations = append(destinations, target.Path)
-}
+			destFilePath := filepath.Join(dest, backupFileName)
+			fmt.Printf("  %sCopying file:%s %s\n", ColorDim, ColorReset, filepath.Base(destFilePath))
 
-// Check if we have any destinations
-if len(destinations) == 0 {
-fmt.Println("Error: No backup destinations found in config file and no destination specified")
-os.Exit(1)
-}
-}
+			if err := backupService.CopyFile(tempBackupPath, destFilePath); err != nil {
+				fmt.Printf("  %s❌ Error: failed to copy backup -%s %v\n", ColorRed, ColorReset, err)
+			} else {
+				fmt.Printf("  %s✅ Success:%s backup copied successfully\n", ColorGreen, ColorReset)
 
-// Copy backup file to all destinations
-fmt.Println("\nProcessing backup destinations:")
-for _, dest := range destinations {
-fmt.Printf("\n→ Destination: %s\n", dest)
+				// Get maxBackups value from config or use default
+				maxBackups := 7 // Default value
 
-// Check if destination directory exists
-if _, err := os.Stat(dest); os.IsNotExist(err) {
-fmt.Printf("  Skipping: directory does not exist\n")
-continue
-}
+				if configFile != "" || destination == "" {
+					// Only apply rotation if using config or default destination
+					for _, target := range config.Targets {
+						if target.Path == dest {
+							// Always use maxBackups from target, as ReadBackupConfig
+							// already sets the default value of 7 if it was empty
+							maxBackups = target.MaxBackups
+							break
+						}
+					}
 
-destFilePath := filepath.Join(dest, backupFileName)
-fmt.Printf("  Copying file: %s\n", filepath.Base(destFilePath))
+					// Get the current folder name used as prefix from the source path
+					prefixName := filepath.Base(source)
+					if prefixName == "." || prefixName == "/" {
+						prefixName = "go-backup"
+					}
+					prefix := prefixName + "-"
 
-if err := backupService.CopyFile(tempBackupPath, destFilePath); err != nil {
-fmt.Printf("  Error: failed to copy backup - %v\n", err)
-} else {
-fmt.Printf("  Success: backup copied successfully\n")
+					// Cleanup old backups
+					if err := backupService.CleanupOldBackups(dest, prefix, maxBackups); err != nil {
+						fmt.Printf("  %s⚠️  Warning: Failed to cleanup old backups -%s %v\n", ColorYellow, ColorReset, err)
+					} else {
+						fmt.Printf("  %s🔄 Rotation:%s Keeping latest %d backups\n", ColorCyan, ColorReset, maxBackups)
+					}
 
-// Get maxBackups value from config or use default
-maxBackups := 7 // Default value
+					// Record this backup in the config file if we're using a config
+					if configFile != "" {
+						// Get file information for size
+						fileInfo, err := os.Stat(destFilePath)
+						if err == nil {
+							// Create a backup record
+							backupRecord := configService.BackupRecord{
+								Filename:  filepath.Base(destFilePath),
+								Source:    source,
+								CreatedAt: time.Now(),
+								Size:      fileInfo.Size(),
+							}
 
-if configFile != "" || destination == "" {
-// Only apply rotation if using config or default destination
-for _, target := range config.Targets {
-if target.Path == dest {
-// Always use maxBackups from target, as ReadBackupConfig
-// already sets the default value of 7 if it was empty
-maxBackups = target.MaxBackups
-break
-}
-}
+							// Add the record to the config
+							configService.AddBackupRecord(config, dest, backupRecord)
 
-// Get the current folder name used as prefix from the source path
-prefixName := filepath.Base(source)
-if prefixName == "." || prefixName == "/" {
-prefixName = "go-backup"
-}
-prefix := prefixName + "-"
+							// Save updated config
+							if err := configService.WriteBackupConfig(configPath, config); err != nil {
+								fmt.Printf("  %s⚠️  Warning: Failed to update backup history in config -%s %v\n", ColorYellow, ColorReset, err)
+							} else {
+								fmt.Printf("  %s📝 History:%s Updated backup history in %s\n", ColorDim, ColorReset, configPath)
+							}
 
-// Cleanup old backups
-if err := backupService.CleanupOldBackups(dest, prefix, maxBackups); err != nil {
-fmt.Printf("  Warning: Failed to cleanup old backups - %v\n", err)
-} else {
-fmt.Printf("  Rotation: Keeping latest %d backups\n", maxBackups)
-}
+							// Copy the config file to the destination with backup name prefix if enabled
+							if copyConfig {
+								configBaseName := filepath.Base(backupFileName)
+								configBaseName = strings.TrimSuffix(configBaseName, ".tar.gz") // Remove .tar.gz
+								configBaseName = strings.TrimSuffix(configBaseName, ".gpg")    // Remove .gpg if encrypted
+								destConfigPath := filepath.Join(dest, configBaseName+".backup.yaml")
 
-// Record this backup in the config file if we're using a config
-if configFile != "" {
-// Get file information for size
-fileInfo, err := os.Stat(destFilePath)
-if err == nil {
-// Create a backup record
-backupRecord := configService.BackupRecord{
-Filename:  filepath.Base(destFilePath),
-Source:    source,
-CreatedAt: time.Now(),
-Size:      fileInfo.Size(),
-}
+								// Get the encryption receiver if encryption was used
+								currentEncryptionReceiver := encryptionReceiver
 
-// Add the record to the config
-configService.AddBackupRecord(config, dest, backupRecord)
+								// Copy the config with added helpful comments
+								if err := configService.CopyConfigWithHelp(configPath, destConfigPath, useEncryption, currentEncryptionReceiver); err != nil {
+									fmt.Printf("  %s⚠️  Warning: Failed to copy config file to destination -%s %v\n", ColorYellow, ColorReset, err)
+								} else {
+									fmt.Printf("  %s📄 Config:%s Copied config file with usage info to %s\n", ColorGreen, ColorReset, destConfigPath)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 
-// Save updated config
-if err := configService.WriteBackupConfig(configPath, config); err != nil {
-fmt.Printf("  Warning: Failed to update backup history in config - %v\n", err)
-} else {
-fmt.Printf("  History: Updated backup history in %s\n", configPath)
-}
-
-// Copy the config file to the destination with backup name prefix if enabled
-if copyConfig {
-configBaseName := filepath.Base(backupFileName)
-configBaseName = strings.TrimSuffix(configBaseName, ".tar.gz") // Remove .tar.gz
-configBaseName = strings.TrimSuffix(configBaseName, ".gpg")    // Remove .gpg if encrypted
-destConfigPath := filepath.Join(dest, configBaseName+".backup.yaml")
-
-// Get the encryption receiver if encryption was used
-currentEncryptionReceiver := encryptionReceiver
-
-// Copy the config with added helpful comments
-if err := configService.CopyConfigWithHelp(configPath, destConfigPath, useEncryption, currentEncryptionReceiver); err != nil {
-fmt.Printf("  Warning: Failed to copy config file to destination - %v\n", err)
-} else {
-fmt.Printf("  Config: Copied config file with usage info to %s\n", destConfigPath)
-}
-}
-}
-}
-}
-}
-}
-
-// Clean up the temporary file
-os.Remove(tempBackupPath)
-fmt.Println("\nBackup completed successfully!")
-},
+		// Clean up the temporary file
+		os.Remove(tempBackupPath)
+		fmt.Printf("\n%s%s🎉 Backup completed successfully!%s\n", ColorGreen, ColorBold, ColorReset)
+	},
 }
 
 func init() {
-// Local flags for the run command
-runCmd.Flags().StringVarP(&source, "source", "s", "", "Source directory to backup (defaults to current directory)")
-runCmd.Flags().StringVarP(&destination, "dest", "d", "", "Destination directory for backup (if not specified, uses config file)")
-runCmd.Flags().BoolVarP(&compress, "compress", "c", true, "Compress the backup")
-runCmd.Flags().StringVarP(&configFile, "config", "f", ".backup.yaml", "Config file path")
-runCmd.Flags().BoolVarP(&encrypt, "encrypt", "e", false, "Encrypt the backup using GPG")
-runCmd.Flags().StringVar(&encryptTo, "encrypt-to", "", "GPG recipient email for encryption (defaults to config value)")
-runCmd.Flags().StringSliceVar(&excludeDirs, "exclude", []string{".git", "node_modules", "bin"}, "Directories to exclude from backup")
-runCmd.Flags().BoolVar(&copyConfig, "copy-config", true, "Copy the config file to the target directories with the same name prefix as the backup")
+	// Local flags for the run command
+	runCmd.Flags().StringVarP(&source, "source", "s", "", "Source directory to backup (defaults to current directory)")
+	runCmd.Flags().StringVarP(&destination, "dest", "d", "", "Destination directory for backup (if not specified, uses config file)")
+	runCmd.Flags().BoolVarP(&compress, "compress", "c", true, "Compress the backup")
+	runCmd.Flags().StringVarP(&configFile, "config", "f", ".backup.yaml", "Config file path")
+	runCmd.Flags().BoolVarP(&encrypt, "encrypt", "e", false, "Encrypt the backup using GPG")
+	runCmd.Flags().StringVar(&encryptTo, "encrypt-to", "", "GPG recipient email for encryption (defaults to config value)")
+	runCmd.Flags().StringSliceVar(&excludeDirs, "exclude", []string{".git", "node_modules", "bin"}, "Directories to exclude from backup")
+	runCmd.Flags().BoolVar(&copyConfig, "copy-config", true, "Copy the config file to the target directories with the same name prefix as the backup")
 
-// Add command to root
-rootCmd.AddCommand(runCmd)
+	// Add command to root
+	rootCmd.AddCommand(runCmd)
 }
