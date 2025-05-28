@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 // GPGEncrypt encrypts a file using GPG with the specified recipient's public key.
@@ -144,4 +145,31 @@ func GPGDecrypt(encryptedFile, outputFile string, passphrase string) (string, er
 	}
 
 	return outputFile, nil
+}
+
+// ValidateGPGReceiver checks if the provided GPG recipient email is valid
+// and corresponds to a key in the user's keyring.
+func ValidateGPGReceiver(recipient string) (bool, string, error) {
+	// Skip validation if empty
+	if recipient == "" {
+		return false, "", fmt.Errorf("recipient cannot be empty")
+	}
+
+	// Execute gpg command to list keys matching the recipient
+	cmd := exec.Command("gpg", "--batch", "--list-keys", recipient)
+
+	// Capture the output
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false, "", fmt.Errorf("failed to validate GPG recipient: %w", err)
+	}
+
+	// Check if the output contains the recipient
+	outputStr := string(output)
+	if strings.TrimSpace(outputStr) == "" || !strings.Contains(outputStr, "<") {
+		return false, "", fmt.Errorf("no GPG key found for recipient: %s", recipient)
+	}
+
+	// If we found a key, return the output for informational purposes
+	return true, outputStr, nil
 }

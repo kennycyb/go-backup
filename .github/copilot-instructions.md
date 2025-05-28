@@ -10,6 +10,7 @@ Use @terminal when answering questions about Git.
 
 ## Project-Specific Instructions
 - **DO NOT** overwrite `.backup.yaml` files when generating code unless explicitly asked to with `--overwrite` flag
+- **ALWAYS** use `/tmp/.backup.yaml` for self-testing and examples, never the actual `.backup.yaml` in the project directory
 - Preserve the encryption configuration structure in the form:
   ```yaml
   encryption:
