@@ -106,7 +106,8 @@ var _ = Describe("Config", func() {
 
 			// Check that no records were added
 			Expect(config.Targets[0].Backups).To(HaveLen(0))
-		})		It("should set the default maxBackups value when adding to a target with 0 maxBackups", func() {
+		})
+		It("should set the default maxBackups value when adding to a target with 0 maxBackups", func() {
 			// Create a config with a target that has zero maxBackups
 			config := &BackupConfig{
 				Targets: []BackupTarget{
@@ -135,6 +136,34 @@ var _ = Describe("Config", func() {
 
 			// First backup in the list should be the most recently added one (10)
 			Expect(config.Targets[0].Backups[0].Filename).To(Equal("test-backup-10.tar.gz"))
+		})
+	})
+
+	Describe("AddTarget", func() {
+		It("should add a new target if it does not exist", func() {
+			cfg := &BackupConfig{}
+			t1 := BackupTarget{Path: "/tmp/target1"}
+			added := AddTarget(cfg, t1)
+			Expect(added).To(BeTrue())
+			Expect(cfg.Targets).To(HaveLen(1))
+			Expect(cfg.Targets[0].Path).To(Equal("/tmp/target1"))
+		})
+
+		It("should not add a duplicate target", func() {
+			cfg := &BackupConfig{Targets: []BackupTarget{{Path: "/tmp/target1"}}}
+			t1 := BackupTarget{Path: "/tmp/target1"}
+			added := AddTarget(cfg, t1)
+			Expect(added).To(BeFalse())
+			Expect(cfg.Targets).To(HaveLen(1))
+		})
+
+		It("should add multiple unique targets", func() {
+			cfg := &BackupConfig{}
+			added1 := AddTarget(cfg, BackupTarget{Path: "/tmp/target1"})
+			added2 := AddTarget(cfg, BackupTarget{Path: "/tmp/target2"})
+			Expect(added1).To(BeTrue())
+			Expect(added2).To(BeTrue())
+			Expect(cfg.Targets).To(HaveLen(2))
 		})
 	})
 	var (
@@ -342,6 +371,22 @@ target:
 				err = WriteBackupConfig(badConfigPath, config)
 				Expect(err).To(HaveOccurred())
 			})
+		})
+	})
+
+	Describe("DisableEncryption", func() {
+		It("should remove encryption config if present", func() {
+			cfg := &BackupConfig{Encryption: &EncryptionConfig{Method: "gpg", Receiver: "user@example.com"}}
+			changed := DisableEncryption(cfg)
+			Expect(changed).To(BeTrue())
+			Expect(cfg.Encryption).To(BeNil())
+		})
+
+		It("should do nothing if encryption config is already nil", func() {
+			cfg := &BackupConfig{Encryption: nil}
+			changed := DisableEncryption(cfg)
+			Expect(changed).To(BeFalse())
+			Expect(cfg.Encryption).To(BeNil())
 		})
 	})
 })
