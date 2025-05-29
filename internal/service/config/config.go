@@ -2,8 +2,11 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -116,4 +119,62 @@ func AddBackupRecord(config *BackupConfig, targetPath string, record BackupRecor
 			config.Targets[targetIndex].Backups = config.Targets[targetIndex].Backups[:maxBackups]
 		}
 	}
+}
+
+// EnableEncryption sets up GPG encryption in the config file
+func EnableEncryption(config *BackupConfig, receiver string) (string, error) {
+	if receiver == "" {
+		return "", fmt.Errorf("GPG receiver email must be specified when enabling encryption")
+	}
+	valid, keyInfo, err := ValidateGPGReceiver(receiver)
+	if err != nil {
+		return "", fmt.Errorf("error validating GPG key: %w", err)
+	}
+	if !valid {
+		return "", fmt.Errorf("invalid GPG recipient '%s'. Please ensure the key is in your keyring", receiver)
+	}
+	if config.Encryption == nil {
+		config.Encryption = &EncryptionConfig{}
+	}
+	config.Encryption.Method = "gpg"
+	config.Encryption.Receiver = receiver
+	return keyInfo, nil
+}
+
+// DisableEncryption removes encryption from the config
+func DisableEncryption(config *BackupConfig) bool {
+	if config.Encryption != nil {
+		config.Encryption = nil
+		return true
+	}
+	return false
+}
+
+// ValidateGPGReceiver checks if the specified GPG recipient exists in the keyring
+func ValidateGPGReceiver(recipient string) (bool, string, error) {
+	cmd := exec.Command("gpg", "--list-keys", recipient)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		if strings.Contains(string(output), "No public key") {
+			return false, "", nil
+		}
+		return false, "", fmt.Errorf("error checking GPG key: %w", err)
+	}
+	return true, strings.TrimSpace(string(output)), nil
+}
+
+// DeleteTarget removes a backup target by its path. Returns true if deleted, false if not found.
+func DeleteTarget(config *BackupConfig, targetPath string) bool {
+	idx := -1
+	for i, t := range config.Targets {
+		if t.Path == targetPath {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return false
+	}
+	config.Targets = append(config.Targets[:idx], config.Targets[idx+1:]...)
+	return true
 }
