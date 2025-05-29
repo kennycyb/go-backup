@@ -124,6 +124,31 @@ go-backup init
 go-backup restore
 ```
 
+### Config Command
+
+The `config` command allows you to modify your `.backup.yaml` file from the command line:
+
+```bash
+# Add a new backup target
+go-backup config --add-target /path/to/backup/location
+
+# Delete a backup target
+go-backup config --delete-target /path/to/backup/location
+
+# Enable GPG encryption for backups
+go-backup config --enable-encryption --gpg-receiver user@example.com
+
+# Disable encryption
+go-backup config --disable-encryption
+```
+
+Options:
+- `--add-target <path>`: Add a new backup target by path
+- `--delete-target <path>`: Remove a backup target by path
+- `--enable-encryption`: Enable GPG encryption for backups (requires `--gpg-receiver`)
+- `--disable-encryption`: Disable encryption for backups
+- `--gpg-receiver <email>`: Specify the GPG recipient email for encryption
+
 ## Development
 
 This project follows the [Go Backup Project Code Style Guide](code-style.md). Contributors should ensure their code adheres to these guidelines before submitting changes.

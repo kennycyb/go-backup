@@ -178,3 +178,14 @@ func DeleteTarget(config *BackupConfig, targetPath string) bool {
 	config.Targets = append(config.Targets[:idx], config.Targets[idx+1:]...)
 	return true
 }
+
+// AddTarget adds a new backup target to the config if it does not already exist.
+func AddTarget(config *BackupConfig, target BackupTarget) bool {
+	for _, t := range config.Targets {
+		if t.Path == target.Path {
+			return false // Already exists
+		}
+	}
+	config.Targets = append(config.Targets, target)
+	return true
+}

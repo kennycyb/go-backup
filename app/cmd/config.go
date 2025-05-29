@@ -13,6 +13,7 @@ var (
 	disableEncryption bool
 	gpgReceiver       string
 	deleteTarget      string
+	addTarget         string
 )
 
 // configCmd represents the config command
@@ -41,6 +42,16 @@ without having to manually edit the YAML file.`,
 		}
 
 		configChanged := false
+
+		if addTarget != "" {
+			target := configService.BackupTarget{Path: addTarget}
+			if configService.AddTarget(config, target) {
+				fmt.Printf("Target '%s' added to configuration.\n", addTarget)
+				configChanged = true
+			} else {
+				fmt.Printf("Target '%s' already exists in configuration.\n", addTarget)
+			}
+		}
 
 		if deleteTarget != "" {
 			if configService.DeleteTarget(config, deleteTarget) {
@@ -98,4 +109,5 @@ func init() {
 	configCmd.Flags().BoolVar(&disableEncryption, "disable-encryption", false, "Disable encryption for backups")
 	configCmd.Flags().StringVar(&gpgReceiver, "gpg-receiver", "", "GPG recipient email for encryption")
 	configCmd.Flags().StringVar(&deleteTarget, "delete-target", "", "Delete a target from the configuration")
+	configCmd.Flags().StringVar(&addTarget, "add-target", "", "Add a new backup target to the configuration")
 }
