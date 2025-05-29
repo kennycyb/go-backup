@@ -48,7 +48,11 @@ build-all: clean
 # Test the application
 .PHONY: test
 test:
-	$(GO) test -v ./...
+	go test ./... -v -coverprofile=coverage.out
+	@echo
+	@echo "==== Test Coverage Summary ===="
+	@go tool cover -func=coverage.out | grep total:
+	@rm -f coverage.out
 
 # Clean build artifacts
 .PHONY: clean
