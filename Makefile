@@ -90,6 +90,18 @@ list-detailed:
 list-location:
 	$(GO) run $(GOFLAGS) $(LDFLAGS) . list --path $(LOCATION)
 
+# Trivy scan for vulnerabilities
+.PHONY: trivy-scan
+trivy-scan:
+	@echo "Running Trivy vulnerability scan on project directory..."
+	trivy fs --scanners vuln,secret,config .
+
+# Gitleaks scan for secrets
+.PHONY: gitleaks-scan
+gitleaks-scan:
+	@echo "Running Gitleaks secret scan on project directory..."
+	gitleaks detect --source . --no-git --report-format sarif --report-path bin/gitleaks-report.sarif || true
+
 # Help target
 .PHONY: help
 help:
