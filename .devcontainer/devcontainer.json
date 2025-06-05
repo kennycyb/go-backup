@@ -3,6 +3,12 @@
     "build": {
         "dockerfile": "Dockerfile"
     },
+    "mounts": [
+        "source=${env:SSH_AUTH_SOCK},target=/run/host-services/ssh-auth.sock,type=bind,consistency=cached"
+    ],
+    "containerEnv": {
+        "SSH_AUTH_SOCK": "/run/host-services/ssh-auth.sock"
+    },
     "customizations": {
         "vscode": {
             "settings": {
