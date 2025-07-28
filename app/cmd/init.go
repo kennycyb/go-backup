@@ -12,6 +12,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// configOverwrite is a flag that determines whether to overwrite existing configuration files
 var (
 	configOverwrite bool
 )
@@ -26,6 +27,7 @@ in the current directory. This file will define backup targets and settings.`,
 		configFile := ".backup.yaml"
 
 		// Check if config file exists and overwrite flag is not set
+		// Prevents accidental overwriting of existing configurations
 		if _, err := os.Stat(configFile); err == nil && !configOverwrite {
 			fmt.Printf("⚠️ Warning: Configuration file '%s' already exists.\n", configFile)
 			fmt.Printf("To create a new config file and overwrite the existing one, use the --overwrite flag.\n")
@@ -35,6 +37,7 @@ in the current directory. This file will define backup targets and settings.`,
 		}
 
 		// Try to load encryption and target defaults from ~/.backup.yaml
+		// This allows users to define global defaults for new configurations
 		var encryptionDefault *configService.EncryptionConfig
 		var autoTargets []configService.BackupTarget
 		usr, err := user.Current()
@@ -44,8 +47,9 @@ in the current directory. This file will define backup targets and settings.`,
 				defer f.Close()
 				var raw map[string]interface{}
 				if err := yaml.NewDecoder(f).Decode(&raw); err == nil {
+					// Look for default configuration section in home config
 					if def, ok := raw["default"].(map[string]interface{}); ok {
-						// Encryption default
+						// Parse encryption default configuration
 						if enc, ok := def["encryption"].(map[string]interface{}); ok {
 							method, mok := enc["method"].(string)
 							receiver, rok := enc["receiver"].(string)
@@ -56,7 +60,8 @@ in the current directory. This file will define backup targets and settings.`,
 								}
 							}
 						}
-						// Target mapping default
+						// Parse target mapping default configuration
+						// This creates auto-targets based on directory structure relative to defined base paths
 						if tgt, ok := def["target"].([]interface{}); ok {
 							cwd, _ := os.Getwd()
 							parentDir := filepath.Dir(cwd)
@@ -70,7 +75,9 @@ in the current directory. This file will define backup targets and settings.`,
 								if !ok || !ok2 {
 									continue
 								}
+								// Check if current directory is within the base path
 								if rel, err := filepath.Rel(base, parentDir); err == nil && (rel == "." || !strings.HasPrefix(rel, "..")) {
+									// Create backup targets based on the relative path
 									for _, t := range targets {
 										tgtBase, ok := t.(string)
 										if !ok {
@@ -90,11 +97,13 @@ in the current directory. This file will define backup targets and settings.`,
 			}
 		}
 
-		// Create default configuration
+		// Create default configuration with common excludes
 		config := configService.BackupConfig{
-			Excludes: []string{".git", "node_modules", "bin"},
+			Excludes: []string{"node_modules", "bin"},
 			Targets:  []configService.BackupTarget{},
 		}
+
+		// Use auto-detected targets if available, otherwise provide a default target
 		if len(autoTargets) > 0 {
 			config.Targets = append(config.Targets, autoTargets...)
 		} else {
@@ -103,9 +112,13 @@ in the current directory. This file will define backup targets and settings.`,
 				MaxBackups: 7,
 			})
 		}
+
+		// Set encryption configuration from defaults or provide example values
 		if encryptionDefault != nil {
 			config.Encryption = encryptionDefault
 		} else {
+			// Provide example encryption configuration
+			// Note: Users should update the receiver email address
 			config.Encryption = &configService.EncryptionConfig{
 				Method:     "gpg",
 				Receiver:   "user@example.com",
@@ -120,15 +133,16 @@ in the current directory. This file will define backup targets and settings.`,
 			return
 		}
 
+		// Success message with guidance for next steps
 		fmt.Printf("Configuration file '%s' created successfully.\n", configFile)
 		fmt.Println("Edit this file to customize your backup targets and settings.")
 	},
 }
 
 func init() {
-	// Local flags for the init command
+	// Register command line flags for the init command
 	initCmd.Flags().BoolVar(&configOverwrite, "overwrite", false, "Overwrite existing configuration file if it exists")
 
-	// Add command to root
+	// Register the init command with the root command
 	rootCmd.AddCommand(initCmd)
 }
