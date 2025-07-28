@@ -2,6 +2,7 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -24,6 +25,7 @@ var (
 	encrypt     bool
 	encryptTo   string
 	copyConfig  bool
+	force       bool
 )
 
 // runCmd represents the run command (previously backup command)
@@ -99,10 +101,48 @@ This command will package and compress the specified sources.`,
 			fmt.Printf("%sUsing default excludes:%s %v\n", ColorDim, ColorReset, configExcludes)
 		}
 
+		// Check for potentially problematic file sizes before creating archive
+		fmt.Printf("%sAnalyzing files for potential size issues...%s\n", ColorDim, ColorReset)
+		fileSummary, sizeErr := compressionService.CheckFileSizes(source, configExcludes, 8) // 8GB is the standard tar size limit
+		if sizeErr != nil {
+			fmt.Printf("%s%s⚠️ Warning: Unable to analyze file sizes:%s %v\n", ColorYellow, ColorBold, ColorReset, sizeErr)
+		} else if len(fileSummary.FilesOverSize) > 0 {
+			fmt.Printf("%s%s⚠️ Warning: %d files exceed the recommended size limit for tar archives:%s\n",
+				ColorYellow, ColorBold, len(fileSummary.FilesOverSize), ColorReset)
+			for i, file := range fileSummary.FilesOverSize {
+				if i < 5 { // Only show the first 5 files
+					fmt.Printf("  - %s (%.2f GB)\n", file, float64(fileSummary.LargestFileSize)/(1024*1024*1024))
+				} else {
+					fmt.Printf("  - ... and %d more\n", len(fileSummary.FilesOverSize)-5)
+					break
+				}
+			}
+			fmt.Printf("%sConsider excluding these files or using the --split option for large files%s\n",
+				ColorDim, ColorReset)
+
+			// If force flag is not set, ask for confirmation
+			if !force {
+				reader := bufio.NewReader(os.Stdin)
+				fmt.Printf("%sContinue with backup anyway? [y/N]:%s ", ColorYellow, ColorReset)
+				response, _ := reader.ReadString('\n')
+				response = strings.TrimSpace(strings.ToLower(response))
+				if response != "y" && response != "yes" {
+					fmt.Println("Backup aborted.")
+					os.Exit(0)
+				}
+			}
+		}
+
 		// Create the tar.gz archive using the compression service
 		err := compressionService.CreateTarGzArchive(source, tempBackupPath, configExcludes)
 		if err != nil {
-			fmt.Printf("%s%s❌ Error creating backup archive:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+			if strings.Contains(err.Error(), "too large for tar format") {
+				fmt.Printf("%s%s❌ Error creating backup archive:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+				fmt.Printf("%sSuggestion: Use --exclude to skip large files or consider using a different backup strategy for very large files%s\n",
+					ColorYellow, ColorReset)
+			} else {
+				fmt.Printf("%s%s❌ Error creating backup archive:%s %v\n", ColorRed, ColorBold, ColorReset, err)
+			}
 			os.Exit(1)
 		}
 
@@ -259,6 +299,7 @@ func init() {
 	runCmd.Flags().StringVar(&encryptTo, "encrypt-to", "", "GPG recipient email for encryption (defaults to config value)")
 	runCmd.Flags().StringSliceVar(&excludeDirs, "exclude", []string{".git", "node_modules", "bin"}, "Directories to exclude from backup")
 	runCmd.Flags().BoolVar(&copyConfig, "copy-config", true, "Copy the config file to the target directories with the same name prefix as the backup")
+	runCmd.Flags().BoolVar(&force, "force", false, "Force the backup operation, bypassing size warnings")
 
 	// Add command to root
 	rootCmd.AddCommand(runCmd)

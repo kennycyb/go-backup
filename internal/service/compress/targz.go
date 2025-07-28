@@ -24,7 +24,7 @@ func CreateTarGzArchive(sourceDir, targetFile string, excludes []string) error {
 	gzWriter := gzip.NewWriter(tarFile)
 	defer gzWriter.Close()
 
-	// Create a tar writer
+	// Create a tar writer with PAX format for large file support
 	tarWriter := tar.NewWriter(gzWriter)
 	defer tarWriter.Close()
 
@@ -71,9 +71,14 @@ func CreateTarGzArchive(sourceDir, targetFile string, excludes []string) error {
 		// Update the header name to use the relative path
 		header.Name = relPath
 
+		// Use PAX format for large files
+		if info.Size() > RecommendedMaxFileSize {
+			header.Format = tar.FormatPAX
+		}
+
 		// Write the header to the archive
 		if err := tarWriter.WriteHeader(header); err != nil {
-			return fmt.Errorf("error writing tar header: %w", err)
+			return fmt.Errorf("error writing tar header for %s: %w", path, err)
 		}
 
 		// If it's a regular file, write its contents
@@ -84,7 +89,11 @@ func CreateTarGzArchive(sourceDir, targetFile string, excludes []string) error {
 			}
 			defer file.Close()
 
+			// Create a wrapper to handle files that might be too large
 			if _, err := io.Copy(tarWriter, file); err != nil {
+				if strings.Contains(err.Error(), "write too long") {
+					return fmt.Errorf("file %s is too large for tar format (consider splitting large files): %w", path, err)
+				}
 				return fmt.Errorf("error writing file contents to tar: %w", err)
 			}
 		}
