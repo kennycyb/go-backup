@@ -102,7 +102,6 @@ var _ = Describe("Filesize", func() {
 			)
 		})
 	})
-}
 
 	Describe("ListLargeFiles", func() {
 		DescribeTable("listing large files with different thresholds and excludes",
@@ -149,10 +148,10 @@ var _ = Describe("Filesize", func() {
 			},
 			Entry("512 bytes", int64(512), "0.50 KB"),
 			Entry("1 KB", int64(1024), "1.00 KB"),
-			Entry("1 MB", int64(1024 * 1024), "1.00 MB"),
-			Entry("1 GB", int64(1024 * 1024 * 1024), "1.00 GB"),
-			Entry("5 GB", int64(1024 * 1024 * 1024 * 5), "5.00 GB"),
-			Entry("1 TB", int64(1024 * 1024 * 1024 * 1024), "1.00 TB"),
+			Entry("1 MB", int64(1024*1024), "1.00 MB"),
+			Entry("1 GB", int64(1024*1024*1024), "1.00 GB"),
+			Entry("5 GB", int64(1024*1024*1024*5), "5.00 GB"),
+			Entry("1 TB", int64(1024*1024*1024*1024), "1.00 TB"),
 		)
 	})
 
