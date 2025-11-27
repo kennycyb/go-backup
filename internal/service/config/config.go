@@ -28,6 +28,17 @@ type BackupTarget struct {
 	Backups    []BackupRecord `yaml:"backups,omitempty"`
 }
 
+// Validate checks that the BackupTarget has exactly one of Path or File set
+func (t BackupTarget) Validate() error {
+	if t.Path != "" && t.File != "" {
+		return fmt.Errorf("backup target cannot have both 'path' and 'file' set")
+	}
+	if t.Path == "" && t.File == "" {
+		return fmt.Errorf("backup target must have either 'path' or 'file' set")
+	}
+	return nil
+}
+
 // EncryptionConfig represents the encryption configuration
 type EncryptionConfig struct {
 	Method     string `yaml:"method"`
@@ -54,8 +65,14 @@ func ReadBackupConfig(filePath string) (*BackupConfig, error) {
 		return nil, err
 	}
 
-	// Set default values for any targets with unspecified/zero maxBackups
+	// Validate and set default values for targets
 	for i := range config.Targets {
+		// Validate that each target has exactly one of path or file set
+		if err := config.Targets[i].Validate(); err != nil {
+			return nil, fmt.Errorf("invalid target at index %d: %w", i, err)
+		}
+
+		// Set default values for any targets with unspecified/zero maxBackups
 		if config.Targets[i].MaxBackups <= 0 {
 			config.Targets[i].MaxBackups = 7 // Default value
 		}
@@ -199,12 +216,18 @@ func DeleteTarget(config *BackupConfig, targetPath string) bool {
 }
 
 // AddTarget adds a new backup target to the config if it does not already exist.
-func AddTarget(config *BackupConfig, target BackupTarget) bool {
+// Returns an error if the target is invalid or already exists.
+func AddTarget(config *BackupConfig, target BackupTarget) error {
+	// Validate the target before adding
+	if err := target.Validate(); err != nil {
+		return err
+	}
+
 	for _, t := range config.Targets {
 		if t.GetDestination() == target.GetDestination() {
-			return false // Already exists
+			return fmt.Errorf("target '%s' already exists", target.GetDestination())
 		}
 	}
 	config.Targets = append(config.Targets, target)
-	return true
+	return nil
 }
