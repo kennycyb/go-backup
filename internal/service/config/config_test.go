@@ -433,9 +433,9 @@ target:
 				Expect(target.GetDestination()).To(Equal("/path/to/backup/dir"))
 			})
 
-			It("should panic when both path and file are empty (invalid target)", func() {
+			It("should return empty string when both are empty", func() {
 				target := BackupTarget{}
-				Expect(func() { target.GetDestination() }).To(Panic())
+				Expect(target.GetDestination()).To(Equal(""))
 			})
 		})
 	})
