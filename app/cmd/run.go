@@ -245,15 +245,8 @@ This command will package and compress the specified sources.`,
 					continue
 				}
 				destFilePath = dest
-				// For file targets, use a fixed filename without timestamp
-				currentDir := filepath.Base(source)
-				if currentDir == "." || currentDir == "/" {
-					currentDir = "go-backup"
-				}
-				backupFileNameForTarget = fmt.Sprintf("%s.tar.gz", currentDir)
-				if useEncryption {
-					backupFileNameForTarget = backupFileNameForTarget + ".gpg"
-				}
+				// For file targets, use the actual filename specified in the target's File field
+				backupFileNameForTarget = filepath.Base(dest)
 			}
 
 			fmt.Printf("  %sCopying file:%s %s\n", ColorDim, ColorReset, filepath.Base(destFilePath))
