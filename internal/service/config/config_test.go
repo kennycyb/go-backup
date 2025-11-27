@@ -1,7 +1,6 @@
 package config_test
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -107,35 +106,41 @@ var _ = Describe("Config", func() {
 			// Check that no records were added
 			Expect(config.Targets[0].Backups).To(HaveLen(0))
 		})
-		It("should set the default maxBackups value when adding to a target with 0 maxBackups", func() {
-			// Create a config with a target that has zero maxBackups
+		It("should handle file targets by keeping only the most recent backup", func() {
+			// Create a config with a file target that already has some backups
 			config := &BackupConfig{
 				Targets: []BackupTarget{
 					{
-						Path:       "/backup/path",
-						MaxBackups: 0, // Zero value should be replaced with default
-						Backups:    []BackupRecord{},
+						File: "/backup/file.tar.gz",
+						Backups: []BackupRecord{
+							{
+								Filename:  "go-backup.tar.gz",
+								CreatedAt: time.Date(2023, 1, 1, 12, 0, 0, 0, time.UTC),
+							},
+							{
+								Filename:  "go-backup.tar.gz",
+								CreatedAt: time.Date(2023, 1, 2, 12, 0, 0, 0, time.UTC),
+							},
+						},
 					},
 				},
 			}
 
-			// Add backup records
-			for i := 1; i <= 10; i++ {
-				record := BackupRecord{
-					Filename:  fmt.Sprintf("test-backup-%d.tar.gz", i),
-					Source:    "/source/path",
-					CreatedAt: time.Now().AddDate(0, 0, -i),
-					Size:      int64(i * 1000),
-				}
-				AddBackupRecord(config, "/backup/path", record)
+			// Create a test backup record
+			record := BackupRecord{
+				Filename:  "go-backup.tar.gz",
+				Source:    "/source/path",
+				CreatedAt: time.Date(2023, 1, 3, 12, 0, 0, 0, time.UTC),
+				Size:      1024,
 			}
 
-			// Should have set MaxBackups to 7 and limited the backups
-			Expect(config.Targets[0].MaxBackups).To(Equal(7))
-			Expect(config.Targets[0].Backups).To(HaveLen(7))
+			// Add the record
+			AddBackupRecord(config, "/backup/file.tar.gz", record)
 
-			// First backup in the list should be the most recently added one (10)
-			Expect(config.Targets[0].Backups[0].Filename).To(Equal("test-backup-10.tar.gz"))
+			// Check that we only have 1 record (file targets don't rotate)
+			Expect(config.Targets[0].Backups).To(HaveLen(1))
+			Expect(config.Targets[0].Backups[0].Filename).To(Equal("go-backup.tar.gz"))
+			Expect(config.Targets[0].Backups[0].CreatedAt).To(Equal(time.Date(2023, 1, 3, 12, 0, 0, 0, time.UTC)))
 		})
 	})
 
@@ -157,13 +162,22 @@ var _ = Describe("Config", func() {
 			Expect(cfg.Targets).To(HaveLen(1))
 		})
 
-		It("should add multiple unique targets", func() {
+		It("should handle file targets correctly", func() {
 			cfg := &BackupConfig{}
-			added1 := AddTarget(cfg, BackupTarget{Path: "/tmp/target1"})
-			added2 := AddTarget(cfg, BackupTarget{Path: "/tmp/target2"})
-			Expect(added1).To(BeTrue())
-			Expect(added2).To(BeTrue())
-			Expect(cfg.Targets).To(HaveLen(2))
+			t1 := BackupTarget{File: "/tmp/backup.tar.gz"}
+			added := AddTarget(cfg, t1)
+			Expect(added).To(BeTrue())
+			Expect(cfg.Targets).To(HaveLen(1))
+			Expect(cfg.Targets[0].File).To(Equal("/tmp/backup.tar.gz"))
+			Expect(cfg.Targets[0].Path).To(Equal(""))
+		})
+
+		It("should not add duplicate file targets", func() {
+			cfg := &BackupConfig{Targets: []BackupTarget{{File: "/tmp/backup.tar.gz"}}}
+			t1 := BackupTarget{File: "/tmp/backup.tar.gz"}
+			added := AddTarget(cfg, t1)
+			Expect(added).To(BeFalse())
+			Expect(cfg.Targets).To(HaveLen(1))
 		})
 	})
 	var (
@@ -387,6 +401,42 @@ target:
 			changed := DisableEncryption(cfg)
 			Expect(changed).To(BeFalse())
 			Expect(cfg.Encryption).To(BeNil())
+		})
+	})
+
+	Describe("BackupTarget methods", func() {
+		Describe("IsFileTarget", func() {
+			It("should return true for file targets", func() {
+				target := BackupTarget{File: "/path/to/backup.tar.gz"}
+				Expect(target.IsFileTarget()).To(BeTrue())
+			})
+
+			It("should return false for path targets", func() {
+				target := BackupTarget{Path: "/path/to/backup/dir"}
+				Expect(target.IsFileTarget()).To(BeFalse())
+			})
+
+			It("should return false when both path and file are empty", func() {
+				target := BackupTarget{}
+				Expect(target.IsFileTarget()).To(BeFalse())
+			})
+		})
+
+		Describe("GetDestination", func() {
+			It("should return file path for file targets", func() {
+				target := BackupTarget{File: "/path/to/backup.tar.gz"}
+				Expect(target.GetDestination()).To(Equal("/path/to/backup.tar.gz"))
+			})
+
+			It("should return path for path targets", func() {
+				target := BackupTarget{Path: "/path/to/backup/dir"}
+				Expect(target.GetDestination()).To(Equal("/path/to/backup/dir"))
+			})
+
+			It("should panic when both path and file are empty (invalid target)", func() {
+				target := BackupTarget{}
+				Expect(func() { target.GetDestination() }).To(Panic())
+			})
 		})
 	})
 })

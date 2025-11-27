@@ -22,8 +22,9 @@ type BackupRecord struct {
 
 // BackupTarget represents a target destination for backups
 type BackupTarget struct {
-	Path       string         `yaml:"path"`
-	MaxBackups int            `yaml:"maxBackups"`
+	Path       string         `yaml:"path,omitempty"`
+	File       string         `yaml:"file,omitempty"`
+	MaxBackups int            `yaml:"maxBackups,omitempty"`
 	Backups    []BackupRecord `yaml:"backups,omitempty"`
 }
 
@@ -88,12 +89,25 @@ func WriteBackupConfig(filePath string, config *BackupConfig) error {
 	return os.WriteFile(filePath, yamlData, 0644)
 }
 
+// IsFileTarget returns true if this target is a single file backup (no rotation)
+func (t BackupTarget) IsFileTarget() bool {
+	return t.File != ""
+}
+
+// GetDestination returns the destination path for this target
+func (t BackupTarget) GetDestination() string {
+	if t.IsFileTarget() {
+		return t.File
+	}
+	return t.Path
+}
+
 // AddBackupRecord adds a new backup record to the specified target in the config
 func AddBackupRecord(config *BackupConfig, targetPath string, record BackupRecord) {
 	// Find the target index
 	targetIndex := -1
 	for i, target := range config.Targets {
-		if target.Path == targetPath {
+		if target.GetDestination() == targetPath {
 			targetIndex = i
 			break
 		}
@@ -101,22 +115,27 @@ func AddBackupRecord(config *BackupConfig, targetPath string, record BackupRecor
 
 	// If target found, add the backup record
 	if targetIndex >= 0 {
-		// Add the new backup to the beginning of the list for the target
-		config.Targets[targetIndex].Backups = append(
-			[]BackupRecord{record},
-			config.Targets[targetIndex].Backups...,
-		)
+		// For file targets, only keep the most recent backup record
+		if config.Targets[targetIndex].IsFileTarget() {
+			config.Targets[targetIndex].Backups = []BackupRecord{record}
+		} else {
+			// Add the new backup to the beginning of the list for the target
+			config.Targets[targetIndex].Backups = append(
+				[]BackupRecord{record},
+				config.Targets[targetIndex].Backups...,
+			)
 
-		// Ensure we have a valid maxBackups value
-		maxBackups := config.Targets[targetIndex].MaxBackups
-		if maxBackups <= 0 {
-			maxBackups = 7 // Default value
-			config.Targets[targetIndex].MaxBackups = maxBackups
-		}
+			// Ensure we have a valid maxBackups value
+			maxBackups := config.Targets[targetIndex].MaxBackups
+			if maxBackups <= 0 {
+				maxBackups = 7 // Default value
+				config.Targets[targetIndex].MaxBackups = maxBackups
+			}
 
-		// Trim the list to match the maxBackups value if needed
-		if len(config.Targets[targetIndex].Backups) > maxBackups {
-			config.Targets[targetIndex].Backups = config.Targets[targetIndex].Backups[:maxBackups]
+			// Trim the list to match the maxBackups value if needed
+			if len(config.Targets[targetIndex].Backups) > maxBackups {
+				config.Targets[targetIndex].Backups = config.Targets[targetIndex].Backups[:maxBackups]
+			}
 		}
 	}
 }
@@ -167,7 +186,7 @@ func ValidateGPGReceiver(recipient string) (bool, string, error) {
 func DeleteTarget(config *BackupConfig, targetPath string) bool {
 	idx := -1
 	for i, t := range config.Targets {
-		if t.Path == targetPath {
+		if t.GetDestination() == targetPath {
 			idx = i
 			break
 		}
@@ -182,7 +201,7 @@ func DeleteTarget(config *BackupConfig, targetPath string) bool {
 // AddTarget adds a new backup target to the config if it does not already exist.
 func AddTarget(config *BackupConfig, target BackupTarget) bool {
 	for _, t := range config.Targets {
-		if t.Path == target.Path {
+		if t.GetDestination() == target.GetDestination() {
 			return false // Already exists
 		}
 	}

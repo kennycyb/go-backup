@@ -195,13 +195,60 @@ This command will package and compress the specified sources.`,
 
 		fmt.Printf("\n%s%sProcessing backup destinations:%s\n", ColorCyan, ColorBold, ColorReset)
 		for _, dest := range destinations {
-			fmt.Printf("\n%s→ Destination:%s %s\n", ColorBlue, ColorReset, dest)
-			if _, err := os.Stat(dest); os.IsNotExist(err) {
-				fmt.Printf("  %s⚠️  Skipping: directory does not exist%s\n", ColorYellow, ColorReset)
-				continue
+			isFileTarget := false
+
+			// If destination comes from config, try to find the matching target for file/dir info
+			var backupFileNameForTarget string = backupFileName
+			var destFilePath string
+
+			// Try to match config target for this destination
+			var matchedTarget *configService.Target
+			for _, t := range config.Targets {
+				if t.Path == dest {
+					matchedTarget = &t
+					break
+				}
 			}
 
-			destFilePath := filepath.Join(dest, backupFileName)
+			if matchedTarget != nil {
+				isFileTarget = matchedTarget.IsFileTarget()
+			} else {
+				// If not found in config, infer: if path exists and is dir, or ends with separator, treat as dir
+				info, err := os.Stat(dest)
+				if err == nil && info.IsDir() {
+					isFileTarget = false
+				} else if strings.HasSuffix(dest, string(os.PathSeparator)) {
+					isFileTarget = false
+				} else {
+					isFileTarget = true
+				}
+			}
+
+			fmt.Printf("\n%s→ Destination:%s %s", ColorBlue, ColorReset, dest)
+			if isFileTarget {
+				fmt.Printf(" %s(file)%s", ColorDim, ColorReset)
+			}
+			fmt.Println()
+			if !isFileTarget {
+				// For directory targets, check if directory exists
+				if _, err := os.Stat(dest); os.IsNotExist(err) {
+					fmt.Printf("  %s⚠️  Skipping: directory does not exist%s\n", ColorYellow, ColorReset)
+					continue
+				}
+				destFilePath = filepath.Join(dest, backupFileName)
+			} else {
+				// For file targets, use the file path directly
+				// Create directory if it doesn't exist
+				destDir := filepath.Dir(dest)
+				if err := os.MkdirAll(destDir, 0755); err != nil {
+					fmt.Printf("  %s❌ Error: failed to create destination directory -%s %v\n", ColorRed, ColorReset, err)
+					continue
+				}
+				destFilePath = dest
+				// For file targets, use the actual filename specified in the target's File field
+				backupFileNameForTarget = filepath.Base(dest)
+			}
+
 			fmt.Printf("  %sCopying file:%s %s\n", ColorDim, ColorReset, filepath.Base(destFilePath))
 
 			if err := backupService.CopyFile(tempBackupPath, destFilePath); err != nil {
@@ -213,28 +260,32 @@ This command will package and compress the specified sources.`,
 				maxBackups := 7 // Default value
 
 				if configFile != "" || destination == "" {
-					// Only apply rotation if using config or default destination
-					for _, target := range config.Targets {
-						if target.Path == dest {
-							// Always use maxBackups from target, as ReadBackupConfig
-							// already sets the default value of 7 if it was empty
-							maxBackups = target.MaxBackups
-							break
+					// Only apply rotation if using config or default destination and not a file target
+					if !isFileTarget {
+						for _, target := range config.Targets {
+							if target.GetDestination() == dest {
+								// Always use maxBackups from target, as ReadBackupConfig
+								// already sets the default value of 7 if it was empty
+								maxBackups = target.MaxBackups
+								break
+							}
 						}
-					}
 
-					// Get the current folder name used as prefix from the source path
-					prefixName := filepath.Base(source)
-					if prefixName == "." || prefixName == "/" {
-						prefixName = "go-backup"
-					}
-					prefix := prefixName + "-"
+						// Get the current folder name used as prefix from the source path
+						prefixName := filepath.Base(source)
+						if prefixName == "." || prefixName == "/" {
+							prefixName = "go-backup"
+						}
+						prefix := prefixName + "-"
 
-					// Cleanup old backups
-					if err := backupService.CleanupOldBackups(dest, prefix, maxBackups); err != nil {
-						fmt.Printf("  %s⚠️  Warning: Failed to cleanup old backups -%s %v\n", ColorYellow, ColorReset, err)
+						// Cleanup old backups
+						if err := backupService.CleanupOldBackups(dest, prefix, maxBackups); err != nil {
+							fmt.Printf("  %s⚠️  Warning: Failed to cleanup old backups -%s %v\n", ColorYellow, ColorReset, err)
+						} else {
+							fmt.Printf("  %s🔄 Rotation:%s Keeping latest %d backups\n", ColorCyan, ColorReset, maxBackups)
+						}
 					} else {
-						fmt.Printf("  %s🔄 Rotation:%s Keeping latest %d backups\n", ColorCyan, ColorReset, maxBackups)
+						fmt.Printf("  %s📄 File target:%s No rotation applied (single file backup)\n", ColorCyan, ColorReset)
 					}
 
 					// Record this backup in the config file if we're using a config
@@ -262,10 +313,19 @@ This command will package and compress the specified sources.`,
 
 							// Copy the config file to the destination with backup name prefix if enabled
 							if copyConfig {
-								configBaseName := filepath.Base(backupFileName)
+								configBaseName := filepath.Base(backupFileNameForTarget)
 								configBaseName = strings.TrimSuffix(configBaseName, ".tar.gz") // Remove .tar.gz
 								configBaseName = strings.TrimSuffix(configBaseName, ".gpg")    // Remove .gpg if encrypted
-								destConfigPath := filepath.Join(dest, configBaseName+".backup.yaml")
+
+								// For file targets, copy config to the directory containing the file
+								// For directory targets, copy config to the destination directory
+								var destConfigDir string
+								if isFileTarget {
+									destConfigDir = filepath.Dir(dest)
+								} else {
+									destConfigDir = dest
+								}
+								destConfigPath := filepath.Join(destConfigDir, configBaseName+".backup.yaml")
 
 								// Get the encryption receiver if encryption was used
 								currentEncryptionReceiver := encryptionReceiver
