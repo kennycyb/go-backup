@@ -148,8 +148,8 @@ var _ = Describe("Config", func() {
 		It("should add a new target if it does not exist", func() {
 			cfg := &BackupConfig{}
 			t1 := BackupTarget{Path: "/tmp/target1"}
-			added := AddTarget(cfg, t1)
-			Expect(added).To(BeTrue())
+			err := AddTarget(cfg, t1)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.Targets).To(HaveLen(1))
 			Expect(cfg.Targets[0].Path).To(Equal("/tmp/target1"))
 		})
@@ -157,16 +157,17 @@ var _ = Describe("Config", func() {
 		It("should not add a duplicate target", func() {
 			cfg := &BackupConfig{Targets: []BackupTarget{{Path: "/tmp/target1"}}}
 			t1 := BackupTarget{Path: "/tmp/target1"}
-			added := AddTarget(cfg, t1)
-			Expect(added).To(BeFalse())
+			err := AddTarget(cfg, t1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("already exists"))
 			Expect(cfg.Targets).To(HaveLen(1))
 		})
 
 		It("should handle file targets correctly", func() {
 			cfg := &BackupConfig{}
 			t1 := BackupTarget{File: "/tmp/backup.tar.gz"}
-			added := AddTarget(cfg, t1)
-			Expect(added).To(BeTrue())
+			err := AddTarget(cfg, t1)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(cfg.Targets).To(HaveLen(1))
 			Expect(cfg.Targets[0].File).To(Equal("/tmp/backup.tar.gz"))
 			Expect(cfg.Targets[0].Path).To(Equal(""))
@@ -175,9 +176,28 @@ var _ = Describe("Config", func() {
 		It("should not add duplicate file targets", func() {
 			cfg := &BackupConfig{Targets: []BackupTarget{{File: "/tmp/backup.tar.gz"}}}
 			t1 := BackupTarget{File: "/tmp/backup.tar.gz"}
-			added := AddTarget(cfg, t1)
-			Expect(added).To(BeFalse())
+			err := AddTarget(cfg, t1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("already exists"))
 			Expect(cfg.Targets).To(HaveLen(1))
+		})
+
+		It("should reject target with both path and file set", func() {
+			cfg := &BackupConfig{}
+			t1 := BackupTarget{Path: "/tmp/target1", File: "/tmp/backup.tar.gz"}
+			err := AddTarget(cfg, t1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("cannot have both"))
+			Expect(cfg.Targets).To(HaveLen(0))
+		})
+
+		It("should reject target with neither path nor file set", func() {
+			cfg := &BackupConfig{}
+			t1 := BackupTarget{}
+			err := AddTarget(cfg, t1)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("must have either"))
+			Expect(cfg.Targets).To(HaveLen(0))
 		})
 	})
 	var (
@@ -304,6 +324,43 @@ target:
 				Expect(config).NotTo(BeNil())
 				Expect(config.Excludes).To(BeEmpty())
 				Expect(config.Targets).To(BeEmpty())
+			})
+		})
+
+		Context("when a target has both path and file set", func() {
+			BeforeEach(func() {
+				configContent := `
+target:
+  - path: "/path/to/backup/location1"
+    file: "/path/to/backup.tar.gz"
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns an error", func() {
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cannot have both"))
+				Expect(config).To(BeNil())
+			})
+		})
+
+		Context("when a target has neither path nor file set", func() {
+			BeforeEach(func() {
+				configContent := `
+target:
+  - maxBackups: 5
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns an error", func() {
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must have either"))
+				Expect(config).To(BeNil())
 			})
 		})
 	})
@@ -436,6 +493,32 @@ target:
 			It("should return empty string when both are empty", func() {
 				target := BackupTarget{}
 				Expect(target.GetDestination()).To(Equal(""))
+			})
+		})
+
+		Describe("Validate", func() {
+			It("should return nil for valid path target", func() {
+				target := BackupTarget{Path: "/path/to/backup/dir"}
+				Expect(target.Validate()).NotTo(HaveOccurred())
+			})
+
+			It("should return nil for valid file target", func() {
+				target := BackupTarget{File: "/path/to/backup.tar.gz"}
+				Expect(target.Validate()).NotTo(HaveOccurred())
+			})
+
+			It("should return error when both path and file are set", func() {
+				target := BackupTarget{Path: "/path/to/backup/dir", File: "/path/to/backup.tar.gz"}
+				err := target.Validate()
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("cannot have both"))
+			})
+
+			It("should return error when neither path nor file is set", func() {
+				target := BackupTarget{}
+				err := target.Validate()
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("must have either"))
 			})
 		})
 	})

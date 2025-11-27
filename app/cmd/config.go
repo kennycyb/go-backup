@@ -57,11 +57,11 @@ Examples:
 		// Handle adding new backup targets
 		if addTarget != "" {
 			target := configService.BackupTarget{Path: addTarget}
-			if configService.AddTarget(config, target) {
+			if err := configService.AddTarget(config, target); err != nil {
+				fmt.Printf("Error adding target '%s': %v\n", addTarget, err)
+			} else {
 				fmt.Printf("Target '%s' added to configuration.\n", addTarget)
 				configChanged = true
-			} else {
-				fmt.Printf("Target '%s' already exists in configuration.\n", addTarget)
 			}
 		}
 
