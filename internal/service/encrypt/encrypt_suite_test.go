@@ -1,6 +1,4 @@
-package encrypt
 package encrypt_test
-
 import (
 	"testing"
 
