@@ -194,41 +194,19 @@ This command will package and compress the specified sources.`,
 		}
 
 		fmt.Printf("\n%s%sProcessing backup destinations:%s\n", ColorCyan, ColorBold, ColorReset)
-		for _, dest := range destinations {
-			isFileTarget := false
-
-			// If destination comes from config, try to find the matching target for file/dir info
-			var backupFileNameForTarget string = backupFileName
-			var destFilePath string
-
-			// Try to match config target for this destination
-			var matchedTarget *configService.Target
-			for _, t := range config.Targets {
-				if t.Path == dest {
-					matchedTarget = &t
-					break
-				}
-			}
-
-			if matchedTarget != nil {
-				isFileTarget = matchedTarget.IsFileTarget()
-			} else {
-				// If not found in config, infer: if path exists and is dir, or ends with separator, treat as dir
-				info, err := os.Stat(dest)
-				if err == nil && info.IsDir() {
-					isFileTarget = false
-				} else if strings.HasSuffix(dest, string(os.PathSeparator)) {
-					isFileTarget = false
-				} else {
-					isFileTarget = true
-				}
-			}
+		for _, target := range config.Targets {
+			dest := target.GetDestination()
+			isFileTarget := target.IsFileTarget()
 
 			fmt.Printf("\n%s→ Destination:%s %s", ColorBlue, ColorReset, dest)
 			if isFileTarget {
 				fmt.Printf(" %s(file)%s", ColorDim, ColorReset)
 			}
 			fmt.Println()
+
+			var destFilePath string
+			var backupFileNameForTarget string = backupFileName
+
 			if !isFileTarget {
 				// For directory targets, check if directory exists
 				if _, err := os.Stat(dest); os.IsNotExist(err) {
@@ -245,8 +223,15 @@ This command will package and compress the specified sources.`,
 					continue
 				}
 				destFilePath = dest
-				// For file targets, use the actual filename specified in the target's File field
-				backupFileNameForTarget = filepath.Base(dest)
+				// For file targets, use a fixed filename without timestamp
+				currentDir := filepath.Base(source)
+				if currentDir == "." || currentDir == "/" {
+					currentDir = "go-backup"
+				}
+				backupFileNameForTarget = fmt.Sprintf("%s.tar.gz", currentDir)
+				if useEncryption {
+					backupFileNameForTarget = backupFileNameForTarget + ".gpg"
+				}
 			}
 
 			fmt.Printf("  %sCopying file:%s %s\n", ColorDim, ColorReset, filepath.Base(destFilePath))
