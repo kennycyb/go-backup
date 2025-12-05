@@ -179,6 +179,22 @@ var _ = Describe("Config", func() {
 			Expect(added).To(BeFalse())
 			Expect(cfg.Targets).To(HaveLen(1))
 		})
+
+		It("should prevent Path/File conflicts with the same destination", func() {
+			// Test adding a File target when a Path target exists with same destination
+			cfg := &BackupConfig{Targets: []BackupTarget{{Path: "/tmp/backup"}}}
+			t1 := BackupTarget{File: "/tmp/backup"}
+			added := AddTarget(cfg, t1)
+			Expect(added).To(BeFalse())
+			Expect(cfg.Targets).To(HaveLen(1))
+
+			// Test adding a Path target when a File target exists with same destination
+			cfg2 := &BackupConfig{Targets: []BackupTarget{{File: "/tmp/backup"}}}
+			t2 := BackupTarget{Path: "/tmp/backup"}
+			added2 := AddTarget(cfg2, t2)
+			Expect(added2).To(BeFalse())
+			Expect(cfg2.Targets).To(HaveLen(1))
+		})
 	})
 	var (
 		tmpDir     string
