@@ -34,7 +34,8 @@ your backup needs easily and efficiently.`,
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute(version string) {
 	Version = version
-	rootCmd.SetVersionTemplate("Version: {{.Version}}\n")
+	rootCmd.Version = version
+	rootCmd.SetVersionTemplate("go-backup version {{.Version}}\n")
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)

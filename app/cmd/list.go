@@ -93,7 +93,43 @@ This command will display information about existing backups.`,
 			} else {
 				// Add all target paths from config
 				for _, target := range config.Targets {
-					backupLocations = append(backupLocations, target.Path)
+					backupLocations = append(backupLocations, target.GetDestination())
+				}
+
+				// Display Target Status if listing all
+				if listAll {
+					fmt.Printf("\n%s%sTarget Status:%s\n", ColorCyan, ColorBold, ColorReset)
+					fmt.Printf("%-30s %-20s %-10s %s\n", "Target", "Last Run", "Status", "Message")
+					fmt.Println(strings.Repeat("-", 90))
+					for _, target := range config.Targets {
+						dest := target.GetDestination()
+						if len(dest) > 30 {
+							dest = "..." + dest[len(dest)-27:]
+						}
+
+						lastRun := "Never"
+						status := "N/A"
+						msg := ""
+						statusColor := ColorDim
+
+						if target.LastRun != nil {
+							lastRun = target.LastRun.Timestamp.Format("2006-01-02 15:04:05")
+							status = target.LastRun.Status
+							msg = target.LastRun.Message
+							if status == "Success" {
+								statusColor = ColorGreen
+							} else if status == "Failure" {
+								statusColor = ColorRed
+							}
+						}
+
+						fmt.Printf("%-30s %-20s %s%-10s%s %s\n",
+							dest,
+							lastRun,
+							statusColor, status, ColorReset,
+							msg)
+					}
+					fmt.Println()
 				}
 
 				// If no targets defined, use default

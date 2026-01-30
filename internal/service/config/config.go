@@ -20,12 +20,20 @@ type BackupRecord struct {
 	Size      int64     `yaml:"size"`
 }
 
+// BackupStatus represents the status of the last backup run
+type BackupStatus struct {
+	Timestamp time.Time `yaml:"timestamp"`
+	Status    string    `yaml:"status"` // "Success" or "Failure"
+	Message   string    `yaml:"message,omitempty"`
+}
+
 // BackupTarget represents a target destination for backups
 type BackupTarget struct {
 	Path       string         `yaml:"path,omitempty"`
 	File       string         `yaml:"file,omitempty"`
 	MaxBackups int            `yaml:"maxBackups,omitempty"`
 	Backups    []BackupRecord `yaml:"backups,omitempty"`
+	LastRun    *BackupStatus  `yaml:"lastRun,omitempty"`
 }
 
 // EncryptionConfig represents the encryption configuration
@@ -40,6 +48,20 @@ type BackupConfig struct {
 	Excludes   []string          `yaml:"excludes"`
 	Targets    []BackupTarget    `yaml:"target"`
 	Encryption *EncryptionConfig `yaml:"encryption,omitempty"`
+}
+
+// GlobalBackupEntry represents a single backup location tracked in the global registry
+type GlobalBackupEntry struct {
+	Location string    `yaml:"location"` // Full path to the directory containing .backup.yaml
+	RunAt    time.Time `yaml:"run_at"`   // Last run timestamp
+}
+
+// GlobalBackupRegistry represents the structure of ~/.backup.yaml global config
+type GlobalBackupRegistry struct {
+	Default struct {
+		Encryption *EncryptionConfig `yaml:"encryption,omitempty"`
+	} `yaml:"default,omitempty"`
+	Backups []GlobalBackupEntry `yaml:"backups,omitempty"`
 }
 
 // ReadBackupConfig reads the backup configuration from the specified file
@@ -207,4 +229,88 @@ func AddTarget(config *BackupConfig, target BackupTarget) bool {
 	}
 	config.Targets = append(config.Targets, target)
 	return true
+}
+
+// UpdateTargetStatus updates the last run status for a specific target
+func UpdateTargetStatus(config *BackupConfig, targetPath string, status string, message string) {
+	for i, target := range config.Targets {
+		if target.GetDestination() == targetPath {
+			config.Targets[i].LastRun = &BackupStatus{
+				Timestamp: time.Now(),
+				Status:    status,
+				Message:   message,
+			}
+			break
+		}
+	}
+}
+
+// UpdateGlobalRegistry updates the global ~/.backup.yaml file to track backup locations
+// If the file doesn't exist, this function returns nil without creating it
+func UpdateGlobalRegistry(localConfigDir string) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	globalConfigPath := filepath.Join(homeDir, ".backup.yaml")
+
+	// Check if global config exists
+	if _, err := os.Stat(globalConfigPath); os.IsNotExist(err) {
+		// Global config doesn't exist, silently return
+		return nil
+	}
+
+	// Read existing global config
+	data, err := os.ReadFile(globalConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read global config: %w", err)
+	}
+
+	var registry GlobalBackupRegistry
+	if err := yaml.Unmarshal(data, &registry); err != nil {
+		return fmt.Errorf("failed to parse global config: %w", err)
+	}
+
+	// Get absolute path of the local config directory
+	absPath, err := filepath.Abs(localConfigDir)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	// Update or add entry for this backup location
+	now := time.Now()
+	found := false
+	for i := range registry.Backups {
+		if registry.Backups[i].Location == absPath {
+			registry.Backups[i].RunAt = now
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		// Add new entry
+		registry.Backups = append(registry.Backups, GlobalBackupEntry{
+			Location: absPath,
+			RunAt:    now,
+		})
+	}
+
+	// Write updated config
+	updatedData, err := yaml.Marshal(&registry)
+	if err != nil {
+		return fmt.Errorf("failed to marshal global config: %w", err)
+	}
+
+	// Add header comment
+	header := "# Global backup registry\n# Tracks all backup locations and their last run times\n"
+	finalData := []byte(header)
+	finalData = append(finalData, updatedData...)
+
+	if err := os.WriteFile(globalConfigPath, finalData, 0644); err != nil {
+		return fmt.Errorf("failed to write global config: %w", err)
+	}
+
+	return nil
 }

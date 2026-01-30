@@ -5,7 +5,7 @@ import (
 )
 
 // Version will be set during build process
-var Version = "dev"
+var Version = "1.0.0"
 
 func main() {
 	// Execute the root command with the version information

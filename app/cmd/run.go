@@ -185,7 +185,7 @@ This command will package and compress the specified sources.`,
 			destinations = append(destinations, destination)
 		} else {
 			for _, target := range config.Targets {
-				destinations = append(destinations, target.Path)
+				destinations = append(destinations, target.GetDestination())
 			}
 			if len(destinations) == 0 {
 				fmt.Printf("%s%s❌ Error:%s No backup destinations found in config file and no destination specified\n", ColorRed, ColorBold, ColorReset)
@@ -202,7 +202,7 @@ This command will package and compress the specified sources.`,
 			var destFilePath string
 
 			// Try to match config target for this destination
-			var matchedTarget *configService.Target
+			var matchedTarget *configService.BackupTarget
 			for _, t := range config.Targets {
 				if t.Path == dest {
 					matchedTarget = &t
@@ -253,8 +253,19 @@ This command will package and compress the specified sources.`,
 
 			if err := backupService.CopyFile(tempBackupPath, destFilePath); err != nil {
 				fmt.Printf("  %s❌ Error: failed to copy backup -%s %v\n", ColorRed, ColorReset, err)
+				if configFile != "" {
+					configService.UpdateTargetStatus(config, dest, "Failure", err.Error())
+					configService.WriteBackupConfig(configPath, config)
+				}
 			} else {
 				fmt.Printf("  %s✅ Success:%s backup copied successfully\n", ColorGreen, ColorReset)
+
+				// Update status to success
+				if configFile != "" {
+					configService.UpdateTargetStatus(config, dest, "Success", "Backup completed successfully")
+					// We will write the config later when adding the record, but if recording is skipped, we should write it here?
+					// The recording logic below handles the write.
+				}
 
 				// Get maxBackups value from config or use default
 				maxBackups := 7 // Default value
@@ -345,6 +356,13 @@ This command will package and compress the specified sources.`,
 
 		// Clean up the temporary file
 		os.Remove(tempBackupPath)
+
+		// Update global registry if ~/.backup.yaml exists
+		localConfigDir := filepath.Dir(configPath)
+		if err := configService.UpdateGlobalRegistry(localConfigDir); err != nil {
+			fmt.Printf("%s%s⚠️  Warning: Failed to update global backup registry:%s %v\n", ColorYellow, ColorBold, ColorReset, err)
+		}
+
 		fmt.Printf("\n%s%s🎉 Backup completed successfully!%s\n", ColorGreen, ColorBold, ColorReset)
 	},
 }
