@@ -314,3 +314,31 @@ func UpdateGlobalRegistry(localConfigDir string) error {
 
 	return nil
 }
+
+// ReadGlobalRegistry reads the global backup registry from ~/.backup.yaml
+func ReadGlobalRegistry() (*GlobalBackupRegistry, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	globalConfigPath := filepath.Join(homeDir, ".backup.yaml")
+
+	// Check if global config exists
+	if _, err := os.Stat(globalConfigPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("global config file ~/.backup.yaml does not exist")
+	}
+
+	// Read global config
+	data, err := os.ReadFile(globalConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read global config: %w", err)
+	}
+
+	var registry GlobalBackupRegistry
+	if err := yaml.Unmarshal(data, &registry); err != nil {
+		return nil, fmt.Errorf("failed to parse global config: %w", err)
+	}
+
+	return &registry, nil
+}
