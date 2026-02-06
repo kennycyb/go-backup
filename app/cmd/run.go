@@ -97,11 +97,11 @@ This command will package and compress the specified sources.`,
 		// Check git status if git option is enabled
 		if config.Options != nil && config.Options.Git.Enable {
 			fmt.Printf("%s🔍 Checking git status...%s\n", ColorCyan, ColorReset)
-			
+
 			// Check if auto-pull is enabled
 			shouldPull := config.Options.Git.Pull == "auto" && config.Options.Git.Branch != ""
 			hasUpdatesFromPull := false
-			
+
 			if shouldPull {
 				// Check if we're on the configured branch
 				currentBranch, err := gitService.GetCurrentBranch(source)
@@ -109,12 +109,12 @@ This command will package and compress the specified sources.`,
 					fmt.Printf("%s⚠️  Warning: Failed to get current branch:%s %v\n", ColorYellow, ColorReset, err)
 					fmt.Printf("%sContinuing with backup anyway...%s\n", ColorDim, ColorReset)
 				} else if currentBranch != config.Options.Git.Branch {
-					fmt.Printf("%s⚠️  Warning: Current branch '%s' does not match configured branch '%s'%s\n", 
+					fmt.Printf("%s⚠️  Warning: Current branch '%s' does not match configured branch '%s'%s\n",
 						ColorYellow, currentBranch, config.Options.Git.Branch, ColorReset)
 					fmt.Printf("%sSkipping auto-pull. Continuing with backup...%s\n", ColorDim, ColorReset)
 				} else {
 					// We're on the right branch, pull latest changes
-					fmt.Printf("%s🔄 Auto-pull enabled on branch '%s'. Pulling latest changes...%s\n", 
+					fmt.Printf("%s🔄 Auto-pull enabled on branch '%s'. Pulling latest changes...%s\n",
 						ColorCyan, config.Options.Git.Branch, ColorReset)
 					pulledUpdates, err := gitService.PullLatest(source)
 					if err != nil {
@@ -128,7 +128,7 @@ This command will package and compress the specified sources.`,
 					}
 				}
 			}
-			
+
 			// Check for uncommitted changes
 			hasChanges, err := gitService.HasUncommittedChanges(source)
 			if err != nil {

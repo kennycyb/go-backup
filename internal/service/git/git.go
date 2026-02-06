@@ -29,8 +29,9 @@ func HasUncommittedChanges(dir string) (bool, error) {
 	return len(status) > 0, nil
 }
 
-// GetCurrentBranch returns the current git branch name for the directory
-// Returns an error if the directory is not a git repository or git command fails
+// GetCurrentBranch returns the current git branch name for the directory.
+// Returns the branch name as a string. In a detached HEAD state, returns "HEAD".
+// Returns an error if the directory is not a git repository or git command fails.
 func GetCurrentBranch(dir string) (string, error) {
 	// Check if directory is a git repository
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-dir")
