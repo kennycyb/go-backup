@@ -69,7 +69,26 @@ target:
         source: "/path/to/source"
         createdAt: "2025-05-20T12:30:45Z"
         size: 1048576
+
+# Optional settings
+options:
+  git:
+    enable: true  # Only run backup when uncommitted changes are detected
 ```
+
+### Smart Backup with Git Integration
+
+The `options.git.enable` setting allows you to run backups conditionally based on git status:
+
+- When `options.git.enable: true`: The backup will only run if there are uncommitted changes in the git repository
+- If no uncommitted changes are detected, the backup is skipped with a message
+- If the directory is not a git repository, a warning is shown and the backup proceeds normally
+- This is useful for automated backups where you only want to backup when there's new work
+
+Example use cases:
+- Automated backups that run on a schedule but only capture when you've made changes
+- Development workflows where you want to backup uncommitted work
+- Integration with git hooks to backup before certain git operations
 
 ## Commands
 

@@ -439,4 +439,120 @@ target:
 			})
 		})
 	})
+
+	Describe("Options", func() {
+		var tmpDir string
+		var configPath string
+
+		BeforeEach(func() {
+			var err error
+			tmpDir, err = os.MkdirTemp("", "config-options-test")
+			Expect(err).NotTo(HaveOccurred())
+			configPath = filepath.Join(tmpDir, "test-config.yaml")
+		})
+
+		AfterEach(func() {
+			os.RemoveAll(tmpDir)
+		})
+
+		Context("when options.git.enable is true", func() {
+			BeforeEach(func() {
+				configContent := `
+excludes:
+  - ".git/**"
+target:
+  - path: "/path/to/backup"
+    maxBackups: 5
+options:
+  git:
+    enable: true
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("reads and parses the git option correctly", func() {
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config).NotTo(BeNil())
+				Expect(config.Options).NotTo(BeNil())
+				Expect(config.Options.Git.Enable).To(BeTrue())
+			})
+		})
+
+		Context("when options.git.enable is false", func() {
+			BeforeEach(func() {
+				configContent := `
+excludes:
+  - ".git/**"
+target:
+  - path: "/path/to/backup"
+    maxBackups: 5
+options:
+  git:
+    enable: false
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("reads and parses the git option correctly", func() {
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config).NotTo(BeNil())
+				Expect(config.Options).NotTo(BeNil())
+				Expect(config.Options.Git.Enable).To(BeFalse())
+			})
+		})
+
+		Context("when options section is missing", func() {
+			BeforeEach(func() {
+				configContent := `
+excludes:
+  - ".git/**"
+target:
+  - path: "/path/to/backup"
+    maxBackups: 5
+`
+				err := os.WriteFile(configPath, []byte(configContent), 0644)
+				Expect(err).NotTo(HaveOccurred())
+			})
+
+			It("returns nil for options", func() {
+				config, err := ReadBackupConfig(configPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(config).NotTo(BeNil())
+				Expect(config.Options).To(BeNil())
+			})
+		})
+
+		Context("when writing config with options", func() {
+			It("preserves the options when writing and reading back", func() {
+				config := &BackupConfig{
+					Excludes: []string{".git/**"},
+					Targets: []BackupTarget{
+						{
+							Path:       "/path/to/backup",
+							MaxBackups: 5,
+						},
+					},
+					Options: &Options{
+						Git: GitOptions{
+							Enable: true,
+						},
+					},
+				}
+
+				err := WriteBackupConfig(configPath, config)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Read the config back
+				readConfig, err := ReadBackupConfig(configPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(readConfig).NotTo(BeNil())
+				Expect(readConfig.Options).NotTo(BeNil())
+				Expect(readConfig.Options.Git.Enable).To(BeTrue())
+			})
+		})
+	})
 })

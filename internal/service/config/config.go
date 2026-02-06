@@ -43,11 +43,22 @@ type EncryptionConfig struct {
 	Passphrase string `yaml:"passphrase,omitempty"`
 }
 
+// GitOptions represents git-related options
+type GitOptions struct {
+	Enable bool `yaml:"enable"`
+}
+
+// Options represents optional backup settings
+type Options struct {
+	Git GitOptions `yaml:"git,omitempty"`
+}
+
 // BackupConfig represents the structure of the backup configuration file
 type BackupConfig struct {
 	Excludes   []string          `yaml:"excludes"`
 	Targets    []BackupTarget    `yaml:"target"`
 	Encryption *EncryptionConfig `yaml:"encryption,omitempty"`
+	Options    *Options          `yaml:"options,omitempty"`
 }
 
 // GlobalBackupEntry represents a single backup location tracked in the global registry
