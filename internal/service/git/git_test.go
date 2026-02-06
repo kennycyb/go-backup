@@ -301,7 +301,6 @@ var _ = Describe("Git", func() {
 					var err error
 					anotherClone, err := os.MkdirTemp("", "git-another-clone")
 					Expect(err).NotTo(HaveOccurred())
-					defer os.RemoveAll(anotherClone)
 
 					cmd := exec.Command("git", "clone", remoteDir, anotherClone)
 					err = cmd.Run()
@@ -337,6 +336,9 @@ var _ = Describe("Git", func() {
 					cmd.Dir = anotherClone
 					err = cmd.Run()
 					Expect(err).NotTo(HaveOccurred())
+
+					// Clean up the clone immediately after use
+					os.RemoveAll(anotherClone)
 				})
 
 				It("returns true for hasUpdates", func() {
