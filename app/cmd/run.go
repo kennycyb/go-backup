@@ -13,6 +13,7 @@ import (
 	compressionService "github.com/kennycyb/go-backup/internal/service/compress"
 	configService "github.com/kennycyb/go-backup/internal/service/config"
 	encryptionService "github.com/kennycyb/go-backup/internal/service/encrypt"
+	gitService "github.com/kennycyb/go-backup/internal/service/git"
 	"github.com/spf13/cobra"
 )
 
@@ -91,6 +92,24 @@ This command will package and compress the specified sources.`,
 		if configErr != nil {
 			fmt.Printf("Error reading config file %s: %v\n", configPath, configErr)
 			os.Exit(1)
+		}
+
+		// Check git status if git option is enabled
+		if config.Options != nil && config.Options.Git.Enable {
+			fmt.Printf("%s🔍 Checking git status...%s\n", ColorCyan, ColorReset)
+			hasChanges, err := gitService.HasUncommittedChanges(source)
+			if err != nil {
+				// If it's not a git repository or git fails, just log a warning and continue
+				fmt.Printf("%s⚠️  Warning: Git check failed:%s %v\n", ColorYellow, ColorReset, err)
+				fmt.Printf("%sContinuing with backup anyway...%s\n", ColorDim, ColorReset)
+			} else if !hasChanges {
+				// No uncommitted changes, skip the backup
+				fmt.Printf("%s✨ No uncommitted changes detected. Backup skipped.%s\n", ColorGreen, ColorReset)
+				fmt.Printf("%sTo run backup anyway, disable git check in .backup.yaml (options.git.enable: false)%s\n", ColorDim, ColorReset)
+				os.Exit(0)
+			} else {
+				fmt.Printf("%s✓ Uncommitted changes detected. Proceeding with backup...%s\n", ColorGreen, ColorReset)
+			}
 		}
 
 		if len(config.Excludes) > 0 {
