@@ -47,7 +47,7 @@ type EncryptionConfig struct {
 type GitOptions struct {
 	Enable bool   `yaml:"enable"`
 	Branch string `yaml:"branch,omitempty"`
-	Pull   string `yaml:"pull,omitempty"` // "auto" to enable auto-pull
+	Pull   string `yaml:"pull,omitempty"` // Valid values: "" (default, no auto-pull) or "auto" to enable auto-pull.
 }
 
 // Options represents optional backup settings
