@@ -89,7 +89,6 @@ Example use cases:
 - Automated backups that run on a schedule but only capture when you've made changes
 - Development workflows where you want to backup uncommitted work
 - Integration with git hooks to backup before certain git operations
-```
 
 ## Commands
 
