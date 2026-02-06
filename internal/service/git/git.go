@@ -72,6 +72,12 @@ func PullLatest(dir string) (bool, error) {
 	cmd = exec.Command("git", "-C", dir, "pull")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		// Check if the pull failed due to merge conflicts
+		conflictCmd := exec.Command("git", "-C", dir, "diff", "--name-only", "--diff-filter=U")
+		conflictOutput, conflictErr := conflictCmd.Output()
+		if conflictErr == nil && strings.TrimSpace(string(conflictOutput)) != "" {
+			return false, fmt.Errorf("git pull resulted in merge conflicts in repository %s; please resolve them and commit the changes: %w (output: %s)", dir, err, string(output))
+		}
 		return false, fmt.Errorf("failed to pull: %w (output: %s)", err, string(output))
 	}
 
