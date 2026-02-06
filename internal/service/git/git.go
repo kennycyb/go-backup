@@ -3,7 +3,9 @@ package git
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -58,6 +60,38 @@ func PullLatest(dir string) (bool, error) {
 	cmd := exec.Command("git", "-C", dir, "rev-parse", "--git-dir")
 	if err := cmd.Run(); err != nil {
 		return false, fmt.Errorf("not a git repository: %w", err)
+	}
+
+	// Get git directory path to check for ongoing operations
+	cmd = exec.Command("git", "-C", dir, "rev-parse", "--git-dir")
+	gitDirOutput, err := cmd.Output()
+	if err != nil {
+		return false, fmt.Errorf("failed to get git directory: %w", err)
+	}
+	gitDir := strings.TrimSpace(string(gitDirOutput))
+	
+	// Make git directory path absolute if it's relative
+	if !filepath.IsAbs(gitDir) {
+		gitDir = filepath.Join(dir, gitDir)
+	}
+
+	// Check for ongoing operations that would prevent pull
+	// Check for rebase
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-merge")); err == nil {
+		return false, fmt.Errorf("repository is in the middle of a rebase operation; please complete or abort it before running backup")
+	}
+	if _, err := os.Stat(filepath.Join(gitDir, "rebase-apply")); err == nil {
+		return false, fmt.Errorf("repository is in the middle of a rebase operation; please complete or abort it before running backup")
+	}
+	
+	// Check for merge
+	if _, err := os.Stat(filepath.Join(gitDir, "MERGE_HEAD")); err == nil {
+		return false, fmt.Errorf("repository is in the middle of a merge operation; please complete or abort it before running backup")
+	}
+	
+	// Check for cherry-pick
+	if _, err := os.Stat(filepath.Join(gitDir, "CHERRY_PICK_HEAD")); err == nil {
+		return false, fmt.Errorf("repository is in the middle of a cherry-pick operation; please complete or abort it before running backup")
 	}
 
 	// Get the current HEAD commit before pull

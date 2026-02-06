@@ -347,6 +347,63 @@ var _ = Describe("Git", func() {
 					Expect(hasUpdates).To(BeTrue())
 				})
 			})
+
+			Context("when repository is in the middle of a merge", func() {
+				BeforeEach(func() {
+					// Create a conflicting situation by creating another branch
+					cmd := exec.Command("git", "checkout", "-b", "test-branch")
+					cmd.Dir = tmpDir
+					err := cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					// Make a change on the test branch
+					testFile := filepath.Join(tmpDir, "test.txt")
+					err = os.WriteFile(testFile, []byte("branch content"), 0644)
+					Expect(err).NotTo(HaveOccurred())
+
+					cmd = exec.Command("git", "add", "test.txt")
+					cmd.Dir = tmpDir
+					err = cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					cmd = exec.Command("git", "commit", "-m", "branch change")
+					cmd.Dir = tmpDir
+					err = cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					// Switch back to master/main
+					cmd = exec.Command("git", "checkout", "-")
+					cmd.Dir = tmpDir
+					err = cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					// Make a conflicting change on master/main
+					err = os.WriteFile(testFile, []byte("master content"), 0644)
+					Expect(err).NotTo(HaveOccurred())
+
+					cmd = exec.Command("git", "add", "test.txt")
+					cmd.Dir = tmpDir
+					err = cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					cmd = exec.Command("git", "commit", "-m", "master change")
+					cmd.Dir = tmpDir
+					err = cmd.Run()
+					Expect(err).NotTo(HaveOccurred())
+
+					// Start a merge that will conflict
+					cmd = exec.Command("git", "merge", "test-branch")
+					cmd.Dir = tmpDir
+					_ = cmd.Run() // This will fail due to conflict, which is expected
+				})
+
+				It("returns an error indicating merge in progress", func() {
+					hasUpdates, err := PullLatest(tmpDir)
+					Expect(err).To(HaveOccurred())
+					Expect(err.Error()).To(ContainSubstring("merge operation"))
+					Expect(hasUpdates).To(BeFalse())
+				})
+			})
 		})
 	})
 })
