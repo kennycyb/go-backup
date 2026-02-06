@@ -73,7 +73,7 @@ target:
 # Optional settings
 options:
   git:
-    enable: true  # Only run backup if git status shows uncommitted changes
+    enable: true  # Only run backup when uncommitted changes are detected
 ```
 
 ### Smart Backup with Git Integration
