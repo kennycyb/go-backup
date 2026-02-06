@@ -43,9 +43,15 @@ type EncryptionConfig struct {
 	Passphrase string `yaml:"passphrase,omitempty"`
 }
 
-// GitOptions represents git-related options
+// GitOptions represents git-related options for backup automation.
+// When Enable is true, backups are skipped if there are no uncommitted changes.
+// Branch specifies the branch name for auto-pull (e.g., "main" or "master").
+// Pull must be set to "auto" to enable automatic git pull before backup.
+// When Pull is "auto" and Branch is set, git pull runs before checking for changes.
 type GitOptions struct {
-	Enable bool `yaml:"enable"`
+	Enable bool   `yaml:"enable"`
+	Branch string `yaml:"branch,omitempty"`
+	Pull   string `yaml:"pull,omitempty"` // Valid values: "" (default, no auto-pull) or "auto" to enable auto-pull.
 }
 
 // Options represents optional backup settings
