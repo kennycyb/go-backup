@@ -45,7 +45,9 @@ type EncryptionConfig struct {
 
 // GitOptions represents git-related options
 type GitOptions struct {
-	Enable bool `yaml:"enable"`
+	Enable bool   `yaml:"enable"`
+	Branch string `yaml:"branch,omitempty"`
+	Pull   string `yaml:"pull,omitempty"` // "auto" to enable auto-pull
 }
 
 // Options represents optional backup settings
