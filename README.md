@@ -73,22 +73,61 @@ target:
 # Optional settings
 options:
   git:
-    enable: true  # Only run backup when uncommitted changes are detected
+    enable: true   # Only run backup when uncommitted changes are detected
+    branch: main   # Branch name for auto-pull feature
+    pull: auto     # Enable automatic git pull before backup
 ```
 
 ### Smart Backup with Git Integration
 
-The `options.git.enable` setting allows you to run backups conditionally based on git status:
+The `options.git` settings allow you to run backups conditionally based on git status:
+
+#### Basic Git Integration
 
 - When `options.git.enable: true`: The backup will only run if there are uncommitted changes in the git repository
 - If no uncommitted changes are detected, the backup is skipped with a message
 - If the directory is not a git repository, a warning is shown and the backup proceeds normally
 - This is useful for automated backups where you only want to backup when there's new work
 
+#### Auto-Pull Feature (Smart Backup 2)
+
+When both `branch` and `pull: auto` are configured, the system will automatically pull the latest changes before running the backup:
+
+```yaml
+options:
+  git:
+    enable: true
+    branch: main    # or master, develop, etc.
+    pull: auto      # enables auto-pull feature
+```
+
+**Behavior:**
+
+1. **Branch Check**: Verifies you're on the configured branch
+   - If on the configured branch: proceeds with auto-pull
+   - If on a different branch: skips auto-pull, but continues to check for uncommitted changes
+
+2. **Auto-Pull**: Automatically runs `git pull` to fetch latest changes from remote
+
+3. **Backup Decision**:
+   - ✅ **Runs backup** if:
+     - Uncommitted changes exist, OR
+     - Pull brought new updates from remote
+   - ⏭️ **Skips backup** if:
+     - No uncommitted changes, AND
+     - No updates from pull (already up-to-date)
+
+**Important Notes:**
+- Auto-pull only works when you're on the configured branch
+- If you're on a different branch, auto-pull is skipped but the system still checks for uncommitted changes
+- The repository must have a remote configured and SSH keys or credential helpers set up for authentication
+- This feature is backward compatible: without `pull: auto`, the original behavior is preserved
+
 Example use cases:
 - Automated backups that run on a schedule but only capture when you've made changes
 - Development workflows where you want to backup uncommitted work
 - Integration with git hooks to backup before certain git operations
+- Continuous backup systems that pull latest changes and backup only when repository is updated
 
 ## Commands
 

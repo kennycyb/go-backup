@@ -97,18 +97,56 @@ This command will package and compress the specified sources.`,
 		// Check git status if git option is enabled
 		if config.Options != nil && config.Options.Git.Enable {
 			fmt.Printf("%s🔍 Checking git status...%s\n", ColorCyan, ColorReset)
+
+			// Check if auto-pull is enabled
+			shouldPull := config.Options.Git.Pull == "auto" && config.Options.Git.Branch != ""
+			hasUpdatesFromPull := false
+
+			if shouldPull {
+				// Check if we're on the configured branch
+				currentBranch, err := gitService.GetCurrentBranch(source)
+				if err != nil {
+					fmt.Printf("%s⚠️  Warning: Failed to get current branch:%s %v\n", ColorYellow, ColorReset, err)
+					fmt.Printf("%sContinuing with backup anyway...%s\n", ColorDim, ColorReset)
+				} else if currentBranch != config.Options.Git.Branch {
+					fmt.Printf("%s⚠️  Warning: Current branch '%s' does not match configured branch '%s'%s\n",
+						ColorYellow, currentBranch, config.Options.Git.Branch, ColorReset)
+					fmt.Printf("%sSkipping auto-pull. Continuing with backup...%s\n", ColorDim, ColorReset)
+				} else {
+					// We're on the right branch, pull latest changes
+					fmt.Printf("%s🔄 Auto-pull enabled on branch '%s'. Pulling latest changes...%s\n",
+						ColorCyan, config.Options.Git.Branch, ColorReset)
+					pulledUpdates, err := gitService.PullLatest(source)
+					if err != nil {
+						fmt.Printf("%s⚠️  Warning: Failed to pull latest changes:%s %v\n", ColorYellow, ColorReset, err)
+						fmt.Printf("%sContinuing with backup anyway...%s\n", ColorDim, ColorReset)
+					} else if pulledUpdates {
+						hasUpdatesFromPull = true
+						fmt.Printf("%s✓ Pulled latest changes successfully.%s\n", ColorGreen, ColorReset)
+					} else {
+						fmt.Printf("%s✓ Already up-to-date.%s\n", ColorGreen, ColorReset)
+					}
+				}
+			}
+
+			// Check for uncommitted changes
 			hasChanges, err := gitService.HasUncommittedChanges(source)
 			if err != nil {
 				// If it's not a git repository or git fails, just log a warning and continue
 				fmt.Printf("%s⚠️  Warning: Git check failed:%s %v\n", ColorYellow, ColorReset, err)
 				fmt.Printf("%sContinuing with backup anyway...%s\n", ColorDim, ColorReset)
-			} else if !hasChanges {
-				// No uncommitted changes, skip the backup
-				fmt.Printf("%s✨ No uncommitted changes detected. Backup skipped.%s\n", ColorGreen, ColorReset)
+			} else if !hasChanges && !hasUpdatesFromPull {
+				// No uncommitted changes and no updates from pull, skip the backup
+				fmt.Printf("%s✨ No uncommitted changes or updates detected. Backup skipped.%s\n", ColorGreen, ColorReset)
 				fmt.Printf("%sTo run backup anyway, disable git check in .backup.yaml (options.git.enable: false)%s\n", ColorDim, ColorReset)
 				os.Exit(0)
 			} else {
-				fmt.Printf("%s✓ Uncommitted changes detected. Proceeding with backup...%s\n", ColorGreen, ColorReset)
+				if hasChanges {
+					fmt.Printf("%s✓ Uncommitted changes detected. Proceeding with backup...%s\n", ColorGreen, ColorReset)
+				}
+				if hasUpdatesFromPull {
+					fmt.Printf("%s✓ Updates pulled from remote. Proceeding with backup...%s\n", ColorGreen, ColorReset)
+				}
 			}
 		}
 
