@@ -1,6 +1,6 @@
 module github.com/kennycyb/go-backup
 
-go 1.24.5
+go 1.26.2
 
 require (
 	github.com/onsi/ginkgo v1.16.5
