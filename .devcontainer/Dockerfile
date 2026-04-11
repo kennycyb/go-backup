@@ -10,7 +10,7 @@ FROM aquasec/trivy:0.57.1 AS trivy
 FROM zricethezav/gitleaks:v8.18.4 AS gitleaks
 
 # Stage 3: Main development environment based on Microsoft's Go devcontainer
-FROM mcr.microsoft.com/devcontainers/go:1.26
+FROM mcr.microsoft.com/devcontainers/go:1.26.2
 
 # Copy Trivy and Gitleaks binaries into the devcontainer
 COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
