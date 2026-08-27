@@ -238,10 +238,16 @@ func DeleteTarget(config *BackupConfig, targetPath string) bool {
 }
 
 // AddTarget adds a new backup target to the config if it does not already exist.
+// Returns false if a target with the same destination already exists, regardless
+// of whether it's a Path or File target, to prevent conflicts.
 func AddTarget(config *BackupConfig, target BackupTarget) bool {
+	targetDest := target.GetDestination()
+	
 	for _, t := range config.Targets {
-		if t.GetDestination() == target.GetDestination() {
-			return false // Already exists
+		if t.GetDestination() == targetDest {
+			// Target with same destination already exists.
+			// This prevents both exact duplicates and Path/File conflicts.
+			return false
 		}
 	}
 	config.Targets = append(config.Targets, target)
